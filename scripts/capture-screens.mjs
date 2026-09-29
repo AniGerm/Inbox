@@ -207,13 +207,13 @@ app.whenReady().then(async () => {
 
   await new Promise((r) => setTimeout(r, 2500))
   // Click first item via execute if needed — mark-seen on load of selection happens in UI
-  await saveShot(win, 'fax-inbox-main.png')
+  await saveShot(win, 'fax-inbox-main-v2.png')
 
   // Setup screen: clear fax folder setting
   settings.faxFolder = null
   await win.reload()
   await new Promise((r) => setTimeout(r, 1500))
-  await saveShot(win, 'fax-inbox-setup.png')
+  await saveShot(win, 'fax-inbox-setup-v2.png')
 
   app.exit(0)
 })

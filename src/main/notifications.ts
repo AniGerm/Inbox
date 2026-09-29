@@ -47,7 +47,7 @@ export function showNewFaxNotification(
 export function getTrayIcon(unreadCount: number): Electron.NativeImage {
   const size = 16
   const canvas = Buffer.from(
-    createSimplePng(size, unreadCount > 0 ? [26, 58, 107] : [90, 101, 120]),
+    createSimplePng(size, unreadCount > 0 ? [11, 61, 145] : [90, 101, 120]),
   )
   return nativeImage.createFromBuffer(canvas)
 }

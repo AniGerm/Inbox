@@ -1,19 +1,21 @@
 :root {
-  --bg: #f3f5f8;
-  --bg-elevated: #f7f8fa;
+  /* Klareres Dunkelblau (kein Teal/Grün) */
+  --bg: #f2f5fa;
+  --bg-elevated: #f7f9fc;
   --surface: #ffffff;
-  --text: #152033;
-  --text-muted: #5a6578;
-  --text-faint: #8b95a8;
-  --accent: #1a3a6b;
-  --accent-soft: #e6ecf5;
+  --text: #0f1c2e;
+  --text-muted: #4a5a70;
+  --text-faint: #7a8aa0;
+  --accent: #0b3d91;
+  --accent-hover: #093278;
+  --accent-soft: #dce7f7;
   --danger: #a83a2e;
   --danger-soft: #f8ebe8;
-  --border: #dde3ec;
-  --border-strong: #c5cedc;
-  --unread: #1a3a6b;
-  --focus: #1a3a6b;
-  --shadow-soft: 0 1px 0 rgba(21, 32, 51, 0.04);
+  --border: #d5deeb;
+  --border-strong: #b7c4d8;
+  --unread: #0b3d91;
+  --focus: #0b3d91;
+  --shadow-soft: 0 1px 0 rgba(15, 28, 46, 0.04);
   --radius: 8px;
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -39,8 +41,8 @@ body {
   line-height: 1.45;
   color: var(--text);
   background:
-    radial-gradient(1200px 600px at 8% -12%, #e4ebf5 0%, transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, #eef1f6 0%, transparent 50%),
+    radial-gradient(1200px 600px at 8% -12%, #d9e5f6 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #e8eef7 0%, transparent 50%),
     var(--bg);
   -webkit-font-smoothing: antialiased;
   user-select: none;
@@ -107,7 +109,7 @@ button {
 
 .brand {
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.2;
@@ -211,14 +213,15 @@ button {
   box-sizing: border-box;
   padding: 8px 18px;
   margin: 0;
+  font-family: var(--font);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #12305c;
-  background: #cfd9ea;
-  border-top: 1px solid #9eb0cc;
-  border-bottom: 1px solid #9eb0cc;
+  color: #0b3d91;
+  background: #d6e2f4;
+  border-top: 1px solid #a8bcd9;
+  border-bottom: 1px solid #a8bcd9;
 }
 
 .list-group:first-child .list-group-banner {
@@ -381,12 +384,14 @@ button {
 }
 
 .btn-primary {
+  background: #0b3d91;
   background: var(--accent);
   color: #fff;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 88%, #000);
+  background: #093278;
+  background: var(--accent-hover);
 }
 
 .btn-ghost {
@@ -454,6 +459,13 @@ button {
   margin: 0;
   letter-spacing: -0.03em;
   color: var(--text);
+}
+
+.brand,
+.empty h2,
+.setup h1,
+.settings-panel h2 {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .empty p,
