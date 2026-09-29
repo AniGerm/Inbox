@@ -176,6 +176,47 @@ info "Installiere .deb systemweit (App-Menü): $(basename "$DEB")"
 run_root apt-get install -y "./$DEB" || run_root dpkg -i "./$DEB"
 run_root apt-get install -f -y >/dev/null 2>&1 || true
 
+# Chromium aborts before any JS if chrome-sandbox exists but is not root:4755.
+# electron-builder postinst often fails when productName contains a space.
+fix_chrome_sandbox() {
+  local candidates=(
+    "/opt/Fax Inbox/chrome-sandbox"
+    "/opt/fax-inbox/chrome-sandbox"
+    "/opt/Fax-Inbox/chrome-sandbox"
+  )
+  local found=""
+  local c
+  for c in "${candidates[@]}"; do
+    if [[ -e "$c" ]]; then
+      found="$c"
+      break
+    fi
+  done
+  if [[ -z "$found" ]]; then
+    found="$(find /opt -maxdepth 2 -type f -name chrome-sandbox 2>/dev/null | head -n1 || true)"
+  fi
+  if [[ -n "$found" ]]; then
+    run_root chown root:root "$found"
+    run_root chmod 4755 "$found"
+    ok "chrome-sandbox SUID: $found ($(stat -c '%a %U:%G' "$found" 2>/dev/null || true))"
+  else
+    warn "chrome-sandbox nicht gefunden — Starte mit --no-sandbox"
+  fi
+
+  # Ensure menu/CLI launches pass --no-sandbox (Chromium reads this before JS).
+  local desktop
+  for desktop in /usr/share/applications/fax-inbox.desktop /usr/share/applications/*fax*inbox*.desktop; do
+    [[ -f "$desktop" ]] || continue
+    if grep -q '^Exec=' "$desktop"; then
+      if ! grep -q -- '--no-sandbox' "$desktop"; then
+        run_root sed -i 's|^Exec=\([^ ]*\)|Exec=\1 --no-sandbox|' "$desktop" || true
+      fi
+      ok "Desktop-Eintrag: $(basename "$desktop")"
+    fi
+  done
+}
+fix_chrome_sandbox
+
 # Refresh desktop database / icon cache (best effort)
 if command -v update-desktop-database >/dev/null 2>&1; then
   run_root update-desktop-database /usr/share/applications 2>/dev/null || true
@@ -232,8 +273,8 @@ if [[ "$SKIP_LAUNCH" -eq 0 ]]; then
   }
 
   if command -v fax-inbox >/dev/null 2>&1; then
-    launch_and_verify fax-inbox || true
+    launch_and_verify fax-inbox --no-sandbox || true
   elif [[ -n "$APPIMAGE" ]]; then
-    launch_and_verify "$HOME/Applications/$(basename "$APPIMAGE")" || true
+    launch_and_verify env ELECTRON_DISABLE_SANDBOX=1 "$HOME/Applications/$(basename "$APPIMAGE")" --no-sandbox || true
   fi
 fi

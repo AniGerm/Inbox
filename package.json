@@ -1,7 +1,7 @@
 {
   "name": "fax-inbox",
   "version": "0.1.0",
-  "description": "Fax Inbox – Desktop-Inbox für eingehende Fax-PDFs",
+  "description": "Fax Inbox \u2013 Desktop-Inbox f\u00fcr eingehende Fax-PDFs",
   "main": "dist-electron/main.js",
   "homepage": "https://github.com/AniGerm/Inbox",
   "author": {
@@ -44,7 +44,7 @@
   "build": {
     "appId": "com.faxinbox.app",
     "productName": "Fax Inbox",
-    "copyright": "Copyright © Fax Inbox",
+    "copyright": "Copyright \u00a9 Fax Inbox",
     "directories": {
       "output": "release",
       "buildResources": "resources"
@@ -89,17 +89,18 @@
       "category": "Office",
       "icon": "resources/icon.png",
       "executableName": "fax-inbox",
-      "synopsis": "Desktop-Inbox für eingehende Fax-PDFs",
-      "description": "Überwacht den Faxordner, zeigt neue PDFs mit Badge und Benachrichtigung, Vorschau, Drucken und Archiv.",
+      "synopsis": "Desktop-Inbox f\u00fcr eingehende Fax-PDFs",
+      "description": "\u00dcberwacht den Faxordner, zeigt neue PDFs mit Badge und Benachrichtigung, Vorschau, Drucken und Archiv.",
       "desktop": {
         "Name": "Fax Inbox",
         "GenericName": "Fax Inbox",
-        "Comment": "Inbox für eingehende Fax-PDFs",
+        "Comment": "Inbox f\u00fcr eingehende Fax-PDFs",
         "Categories": "Office;Utility;",
         "Keywords": "fax;pdf;inbox;ricoh;",
         "StartupWMClass": "fax-inbox",
         "Terminal": "false",
-        "Type": "Application"
+        "Type": "Application",
+        "Exec": "fax-inbox --no-sandbox %U"
       },
       "artifactName": "Fax-Inbox-${version}.${ext}"
     },
@@ -119,7 +120,8 @@
         "libasound2 | libasound2t64",
         "libgbm1",
         "libdrm2"
-      ]
+      ],
+      "afterInstall": "build/linux/after-install.sh"
     },
     "appImage": {
       "artifactName": "Fax-Inbox-${version}.AppImage"

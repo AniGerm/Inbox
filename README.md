@@ -74,12 +74,20 @@ Ohne Git: auf GitHub → Code → Download ZIP (Branch **main**) → entpacken �
 
 ## Ubuntu: App startet nicht / klicken tut nichts
 
+**Sofort-Fix** (häufigste Ursache — `chrome-sandbox` ohne root/setuid):
+
+```bash
+sudo chown root:root "/opt/Fax Inbox/chrome-sandbox"
+sudo chmod 4755 "/opt/Fax Inbox/chrome-sandbox"
+fax-inbox --no-sandbox
+```
+
 1. Im Terminal starten (zeigt Fehler statt still zu sterben):
 
 ```bash
-fax-inbox
+fax-inbox --no-sandbox
 # oder
-~/Applications/Fax-Inbox-*.AppImage
+ELECTRON_DISABLE_SANDBOX=1 ~/Applications/Fax-Inbox-*.AppImage --no-sandbox
 ```
 
 2. Log vom Installer/Start prüfen:
