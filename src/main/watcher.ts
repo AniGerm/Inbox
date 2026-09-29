@@ -54,6 +54,16 @@ function sanitizePdfName(raw: string): string {
   return trimmed.toLowerCase().endsWith('.pdf') ? trimmed : `${trimmed}.pdf`
 }
 
+/** Resolve paths; on Windows compare case-insensitively (chokidar/SMB quirks). */
+function normKey(p: string): string {
+  const resolved = path.resolve(p)
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved
+}
+
+function samePath(a: string, b: string): boolean {
+  return normKey(a) === normKey(b)
+}
+
 export type WatcherCallbacks = {
   onChange: (items: FaxItem[], unreadCount: number, newlyAdded?: FaxItem) => void
 }
@@ -63,9 +73,14 @@ export class FaxWatcher {
   private folder: string | null = null
   private items = new Map<string, FaxItem>()
   private callbacks: WatcherCallbacks
+  private rescanTimer: ReturnType<typeof setInterval> | null = null
 
   constructor(callbacks: WatcherCallbacks) {
     this.callbacks = callbacks
+  }
+
+  private key(filePath: string): string {
+    return normKey(filePath)
   }
 
   getFolder(): string | null {
@@ -84,50 +99,73 @@ export class FaxWatcher {
 
   start(folder: string): void {
     this.stop()
-    this.folder = folder
+    const resolvedFolder = path.resolve(folder)
+    this.folder = resolvedFolder
     this.items.clear()
 
-    if (!folder || !fs.existsSync(folder)) {
+    if (!resolvedFolder || !fs.existsSync(resolvedFolder)) {
       this.emit()
       return
     }
 
-    const arch = archiveDir(folder)
+    const arch = archiveDir(resolvedFolder)
     if (!fs.existsSync(arch)) {
       fs.mkdirSync(arch, { recursive: true })
     }
 
     const state = loadInboxState()
-    const known = new Map(state.items.map((i) => [i.path, i]))
+    const known = new Map(state.items.map((i) => [this.key(i.path), i]))
 
-    this.scanDirectory(folder, false, known)
+    this.scanDirectory(resolvedFolder, false, known)
     this.scanDirectory(arch, true, known)
 
     this.persist()
     this.emit()
 
-    this.watcher = chokidar.watch([folder, arch], {
-      ignored: (p) => {
-        if (shouldIgnore(p)) return true
-        // Allow the roots and their direct PDF children; ignore other dirs/files
-        if (p === folder || p === arch) return false
-        if (!isPdf(p)) return true
-        const parent = path.dirname(p)
-        return parent !== folder && parent !== arch
+    // Windows (esp. SMB/network fax folders): native fs.watch often misses events.
+    // Polling + periodic rescan makes detection reliable like on Linux.
+    const usePolling = process.platform === 'win32'
+
+    this.watcher = chokidar.watch([resolvedFolder, arch], {
+      ignored: (p: string) => {
+        const full = path.resolve(p)
+        if (shouldIgnore(full)) return true
+        if (samePath(full, resolvedFolder) || samePath(full, arch)) return false
+        if (!isPdf(full)) return true
+        const parent = path.dirname(full)
+        return !samePath(parent, resolvedFolder) && !samePath(parent, arch)
       },
       ignoreInitial: true,
       awaitWriteFinish: {
-        stabilityThreshold: 800,
+        stabilityThreshold: usePolling ? 1200 : 800,
         pollInterval: 200,
       },
       depth: 0,
+      usePolling,
+      interval: 1000,
+      binaryInterval: 1000,
+      atomic: true,
     })
 
     this.watcher.on('add', (filePath) => this.handleAdd(filePath))
+    this.watcher.on('change', (filePath) => this.handleAdd(filePath))
     this.watcher.on('unlink', (filePath) => this.handleUnlink(filePath))
+    this.watcher.on('error', (err) => {
+      console.error('Ordnerüberwachung Fehler:', err)
+    })
+
+    if (usePolling) {
+      this.rescanTimer = setInterval(() => {
+        this.rescanForNewFiles()
+      }, 2500)
+    }
   }
 
   stop(): void {
+    if (this.rescanTimer) {
+      clearInterval(this.rescanTimer)
+      this.rescanTimer = null
+    }
     if (this.watcher) {
       void this.watcher.close()
       this.watcher = null
@@ -135,7 +173,7 @@ export class FaxWatcher {
   }
 
   markSeen(filePath: string): FaxItem[] {
-    const item = this.items.get(filePath)
+    const item = this.items.get(this.key(filePath))
     if (item && item.seenAt === null) {
       item.seenAt = new Date().toISOString()
       this.persist()
@@ -145,7 +183,7 @@ export class FaxWatcher {
   }
 
   markUnseen(filePath: string): FaxItem[] {
-    const item = this.items.get(filePath)
+    const item = this.items.get(this.key(filePath))
     if (item) {
       item.seenAt = null
       this.persist()
@@ -155,10 +193,13 @@ export class FaxWatcher {
   }
 
   remove(filePath: string): FaxItem[] {
-    if (this.items.has(filePath)) {
-      this.items.delete(filePath)
+    const k = this.key(filePath)
+    const item = this.items.get(k)
+    if (item) {
+      this.items.delete(k)
       try {
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+        const real = item.path
+        if (fs.existsSync(real)) fs.unlinkSync(real)
       } catch (err) {
         console.error('Löschen fehlgeschlagen:', err)
         throw err
@@ -171,16 +212,17 @@ export class FaxWatcher {
 
   archive(filePath: string): { items: FaxItem[]; path: string } {
     if (!this.folder) throw new Error('Kein Faxordner')
-    const item = this.items.get(filePath)
+    const k = this.key(filePath)
+    const item = this.items.get(k)
     if (!item) throw new Error('Eintrag nicht gefunden')
-    if (item.archived) return { items: this.getItems(), path: filePath }
+    if (item.archived) return { items: this.getItems(), path: item.path }
 
     const destDir = archiveDir(this.folder)
     fs.mkdirSync(destDir, { recursive: true })
     const dest = uniqueTarget(destDir, item.name)
-    fs.renameSync(filePath, dest)
+    fs.renameSync(item.path, dest)
 
-    this.items.delete(filePath)
+    this.items.delete(k)
     const moved: FaxItem = {
       ...item,
       path: dest,
@@ -188,7 +230,7 @@ export class FaxWatcher {
       archived: true,
       seenAt: item.seenAt ?? new Date().toISOString(),
     }
-    this.items.set(dest, moved)
+    this.items.set(this.key(dest), moved)
     this.persist()
     this.emit()
     return { items: this.getItems(), path: dest }
@@ -196,49 +238,51 @@ export class FaxWatcher {
 
   restore(filePath: string): { items: FaxItem[]; path: string } {
     if (!this.folder) throw new Error('Kein Faxordner')
-    const item = this.items.get(filePath)
+    const k = this.key(filePath)
+    const item = this.items.get(k)
     if (!item) throw new Error('Eintrag nicht gefunden')
-    if (!item.archived) return { items: this.getItems(), path: filePath }
+    if (!item.archived) return { items: this.getItems(), path: item.path }
 
     const dest = uniqueTarget(this.folder, item.name)
-    fs.renameSync(filePath, dest)
+    fs.renameSync(item.path, dest)
 
-    this.items.delete(filePath)
+    this.items.delete(k)
     const moved: FaxItem = {
       ...item,
       path: dest,
       name: path.basename(dest),
       archived: false,
     }
-    this.items.set(dest, moved)
+    this.items.set(this.key(dest), moved)
     this.persist()
     this.emit()
     return { items: this.getItems(), path: dest }
   }
 
   rename(filePath: string, newName: string): { items: FaxItem[]; path: string } {
-    const item = this.items.get(filePath)
+    const k = this.key(filePath)
+    const item = this.items.get(k)
     if (!item) throw new Error('Eintrag nicht gefunden')
 
     const safeName = sanitizePdfName(newName)
-    const destDir = path.dirname(filePath)
+    const destDir = path.dirname(item.path)
     const dest = path.join(destDir, safeName)
 
-    if (dest === filePath) {
-      return { items: this.getItems(), path: filePath }
+    if (samePath(dest, item.path)) {
+      return { items: this.getItems(), path: item.path }
     }
     if (fs.existsSync(dest)) {
       throw new Error('Eine Datei mit diesem Namen existiert bereits.')
     }
 
-    fs.renameSync(filePath, dest)
-    this.items.delete(filePath)
+    fs.renameSync(item.path, dest)
+    this.items.delete(k)
     const moved: FaxItem = {
       ...item,
       path: dest,
       name: path.basename(dest),
     }
-    this.items.set(dest, moved)
+    this.items.set(this.key(dest), moved)
     this.persist()
     this.emit()
     return { items: this.getItems(), path: dest }
@@ -247,13 +291,15 @@ export class FaxWatcher {
   private scanDirectory(
     dir: string,
     archived: boolean,
-    known: Map<string, { path: string; addedAt: string; seenAt: string | null; archived?: boolean }>,
+    known: Map<
+      string,
+      { path: string; addedAt: string; seenAt: string | null; archived?: boolean }
+    >,
   ): void {
     if (!fs.existsSync(dir)) return
     for (const name of fs.readdirSync(dir)) {
-      const full = path.join(dir, name)
+      const full = path.resolve(dir, name)
       if (!isPdf(full) || shouldIgnore(full)) continue
-      // Skip nested folders / the Archiv entry when scanning the root
       try {
         if (!fs.statSync(full).isFile()) continue
       } catch {
@@ -261,8 +307,8 @@ export class FaxWatcher {
       }
       const meta = fileMeta(full)
       if (!meta) continue
-      const existing = known.get(full)
-      this.items.set(full, {
+      const existing = known.get(this.key(full))
+      this.items.set(this.key(full), {
         path: full,
         name,
         addedAt: existing?.addedAt ?? meta.mtime.toISOString(),
@@ -273,36 +319,103 @@ export class FaxWatcher {
     }
   }
 
+  /** Fallback for Windows/network folders when chokidar misses an event. */
+  private rescanForNewFiles(): void {
+    if (!this.folder || !fs.existsSync(this.folder)) return
+
+    const roots: Array<{ dir: string; archived: boolean }> = [
+      { dir: this.folder, archived: false },
+      { dir: archiveDir(this.folder), archived: true },
+    ]
+
+    let changed = false
+    const seenKeys = new Set<string>()
+
+    for (const { dir, archived } of roots) {
+      if (!fs.existsSync(dir)) continue
+      for (const name of fs.readdirSync(dir)) {
+        const full = path.resolve(dir, name)
+        if (!isPdf(full) || shouldIgnore(full)) continue
+        try {
+          if (!fs.statSync(full).isFile()) continue
+        } catch {
+          continue
+        }
+        const k = this.key(full)
+        seenKeys.add(k)
+        if (this.items.has(k)) {
+          // Keep size fresh
+          const meta = fileMeta(full)
+          const item = this.items.get(k)!
+          if (meta && item.size !== meta.size) {
+            item.size = meta.size
+            changed = true
+          }
+          continue
+        }
+        const meta = fileMeta(full)
+        if (!meta) continue
+        const item: FaxItem = {
+          path: full,
+          name: path.basename(full),
+          addedAt: new Date().toISOString(),
+          seenAt: archived ? new Date().toISOString() : null,
+          size: meta.size,
+          archived,
+        }
+        this.items.set(k, item)
+        changed = true
+        this.persist()
+        this.emit(archived ? undefined : item)
+      }
+    }
+
+    // Drop entries whose files vanished (without unlink event)
+    for (const [k, item] of [...this.items.entries()]) {
+      if (seenKeys.has(k)) continue
+      if (!fs.existsSync(item.path)) {
+        this.items.delete(k)
+        changed = true
+      }
+    }
+    if (changed) {
+      this.persist()
+      this.emit()
+    }
+  }
+
   private handleAdd(filePath: string): void {
     if (!this.folder || !isPdf(filePath) || shouldIgnore(filePath)) return
-    if (this.items.has(filePath)) return
+    const full = path.resolve(filePath)
+    const k = this.key(full)
+    if (this.items.has(k)) return
 
-    const parent = path.dirname(filePath)
+    const parent = path.dirname(full)
     const arch = archiveDir(this.folder)
-    const archived = parent === arch
-    const inInbox = parent === this.folder
+    const archived = samePath(parent, arch)
+    const inInbox = samePath(parent, this.folder)
     if (!archived && !inInbox) return
 
-    const meta = fileMeta(filePath)
+    const meta = fileMeta(full)
     if (!meta) return
 
     const item: FaxItem = {
-      path: filePath,
-      name: path.basename(filePath),
+      path: full,
+      name: path.basename(full),
       addedAt: new Date().toISOString(),
       seenAt: archived ? new Date().toISOString() : null,
       size: meta.size,
       archived,
     }
-    this.items.set(filePath, item)
+    this.items.set(k, item)
     this.persist()
-    // Notify only for fresh inbox arrivals
     this.emit(archived ? undefined : item)
   }
 
   private handleUnlink(filePath: string): void {
-    if (!this.items.has(filePath)) return
-    this.items.delete(filePath)
+    const k = this.key(filePath)
+    if (!this.items.has(k)) return
+    this.items.delete(k)
     this.persist()
     this.emit()
   }
