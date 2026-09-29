@@ -3,12 +3,16 @@
   "version": "0.1.0",
   "description": "Fax Inbox – Desktop-Inbox für eingehende Fax-PDFs",
   "main": "dist-electron/main.js",
-  "author": "Fax Inbox",
+  "author": {
+    "name": "Fax Inbox",
+    "email": "fax-inbox@users.noreply.github.com"
+  },
   "license": "MIT",
   "private": true,
   "scripts": {
-    "setup": "node -e \"console.log(process.platform==='win32'?'Bitte: .\\\\scripts\\\\setup.ps1':'Bitte: ./scripts/setup.sh')\"",
+    "setup": "node -e \"console.log(process.platform==='win32'?'Bitte: .\\\\scripts\\\\install.ps1':'Bitte: ./scripts/install.sh')\"",
     "setup:linux": "bash scripts/setup.sh",
+    "install:app": "bash scripts/install.sh",
     "dev": "vite",
     "build": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.json --noEmit && vite build",
     "pack": "npm run build && electron-builder --dir",
@@ -39,8 +43,10 @@
   "build": {
     "appId": "com.faxinbox.app",
     "productName": "Fax Inbox",
+    "copyright": "Copyright © Fax Inbox",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "resources"
     },
     "files": [
       "dist/**/*",
@@ -60,7 +66,19 @@
         "nsis",
         "portable"
       ],
-      "icon": "resources/icon.png"
+      "icon": "resources/icon.png",
+      "artifactName": "Fax-Inbox-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Fax Inbox",
+      "runAfterFinish": true,
+      "uninstallDisplayName": "Fax Inbox",
+      "deleteAppDataOnUninstall": false
     },
     "linux": {
       "target": [
@@ -68,11 +86,39 @@
         "deb"
       ],
       "category": "Office",
-      "icon": "resources/icon.png"
+      "icon": "resources/icon.png",
+      "executableName": "fax-inbox",
+      "synopsis": "Desktop-Inbox für eingehende Fax-PDFs",
+      "description": "Überwacht den Faxordner, zeigt neue PDFs mit Badge und Benachrichtigung, Vorschau, Drucken und Archiv.",
+      "desktop": {
+        "Name": "Fax Inbox",
+        "GenericName": "Fax Inbox",
+        "Comment": "Inbox für eingehende Fax-PDFs",
+        "Categories": "Office;Utility;",
+        "Keywords": "fax;pdf;inbox;ricoh;",
+        "StartupWMClass": "fax-inbox",
+        "Terminal": "false",
+        "Type": "Application"
+      },
+      "artifactName": "Fax-Inbox-${version}.${ext}"
     },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+    "deb": {
+      "packageCategory": "office",
+      "priority": "optional",
+      "maintainer": "Fax Inbox <fax-inbox@users.noreply.github.com>",
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libsecret-1-0"
+      ]
+    },
+    "appImage": {
+      "artifactName": "Fax-Inbox-${version}.AppImage"
     }
   }
 }

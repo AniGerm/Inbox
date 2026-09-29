@@ -1,115 +1,85 @@
 # Fax Inbox
 
-Desktop-Inbox für eingehende Fax-PDFs (z. B. Ricoh IM350F). Überwacht den Faxordner, zeigt neue Dateien mit Badge und Benachrichtigung, Vorschau, Drucken und Löschen.
+Desktop-Inbox für eingehende Fax-PDFs (z. B. Ricoh IM350F).
 
-**Plattformen:** Windows und Ubuntu · **Stack:** Electron, Vite, React, TypeScript · **Format:** nur PDF
+**Plattformen:** Windows und Ubuntu · **Stack:** Electron + Vite + React + TypeScript · **Format:** nur PDF
 
-## Einfach installieren (empfohlen)
+## Fire-and-forget Installation (empfohlen)
 
-Es gibt Setup-Skripte, die **Node/npm prüfen**, fehlende Hinweise ausgeben und **`npm install`** ausführen.
+Ein Befehl: baut die App und richtet sie **richtig** ein.  
+Node.js wird **nur zum einmaligen Bauen** gebraucht und bei Bedarf automatisch installiert.  
+Die fertige App enthält Electron bereits — **kein Node zur Laufzeit**.
 
-### Ubuntu / Linux
+### Ubuntu
 
 ```bash
-git clone https://github.com/AniGerm/Inbox.git
+git clone -b cursor/fax-inbox-mvp-df4f https://github.com/AniGerm/Inbox.git
 cd Inbox
-./scripts/setup.sh
-npm run dev
+chmod +x install.sh scripts/install.sh
+./install.sh
 ```
 
-Optional:
+Das Skript:
+
+1. installiert Node.js 22 falls fehlend (NodeSource, benötigt `sudo`)
+2. installiert Electron-Systempakete falls nötig
+3. baut **AppImage** + **`.deb`**
+4. installiert das **`.deb` systemweit** → **„Fax Inbox“ erscheint im Anwendungsmenü** (Büro/Office)
+5. kopiert das **AppImage** nach `~/Applications/`
+6. startet die App
+
+Danach im Menü nach **Fax Inbox** suchen — oder:
 
 ```bash
-./scripts/setup.sh --dev      # Setup + App starten
-./scripts/setup.sh --build    # Setup + Linux-Installer (AppImage + .deb) nach release/
-```
-
-Danach dauerhaft installieren (nach `--build` oder `npm run dist:linux`):
-
-- **AppImage:** Datei in `release/` ausführbar machen und doppelklicken  
-  `chmod +x release/Fax*.AppImage && ./release/Fax*.AppImage`
-- **deb:** `sudo apt install ./release/fax-inbox_*.deb`
-
-Falls das Skript Electron-Systempakete bemängelt:
-
-```bash
-sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libsecret-1-0
+fax-inbox
+# bzw. portable:
+~/Applications/Fax-Inbox-*.AppImage
 ```
 
 ### Windows
 
-In **PowerShell** im Repo:
+In **PowerShell**:
 
 ```powershell
-git clone https://github.com/AniGerm/Inbox.git
+git clone -b cursor/fax-inbox-mvp-df4f https://github.com/AniGerm/Inbox.git
 cd Inbox
-.\scripts\setup.ps1
-npm run dev
+.\install.ps1
 ```
 
-Optional:
+Das Skript:
 
-```powershell
-.\scripts\setup.ps1 -Dev     # Setup + App starten
-.\scripts\setup.ps1 -Build   # Setup + Windows-Installer (NSIS + portable) nach release\
-```
+1. installiert Node.js LTS falls fehlend (`winget`)
+2. baut **NSIS-Setup** + portable EXE
+3. startet die **Setup-.exe** → Startmenü- und Desktop-Verknüpfung
 
-Installer: in `release\` die **Setup-.exe** (NSIS) ausführen oder die **portable .exe** starten.
+Ohne Git: auf GitHub → Code → Download ZIP → entpacken → gleiches `install`-Skript.
 
-> Node.js LTS (≥ 20) muss vorher drauf sein: https://nodejs.org/ oder `winget install OpenJS.NodeJS.LTS`
+## Was du bekommst
 
-### Was die Skripte prüfen
-
-| Check | setup.sh | setup.ps1 |
+| OS | Artefakte | Integration |
 | --- | --- | --- |
-| Node.js ≥ 20 | ja | ja |
-| npm vorhanden | ja | ja |
-| `npm install` | ja | ja |
-| Linux Electron-Libs (Hinweis) | ja | — |
-| Display-Session (Hinweis) | ja | — |
-| Installer bauen | `--build` | `-Build` |
+| Ubuntu | `.deb` + `.AppImage` in `release/` | `.deb` → App-Menü; AppImage → `~/Applications` |
+| Windows | NSIS Setup + portable `.exe` | Startmenü + Desktop (NSIS) |
 
-**Nicht** automatisch: systemweite Node-Installation (dafür sudo/winget nötig) und Cross-Build (Windows-Installer auf Ubuntu braucht Wine).
-
-## Entwicklung (ohne Skript)
+## Nur entwickeln (ohne Installation)
 
 ```bash
-npm install
-npm run dev
+./scripts/setup.sh --dev          # Ubuntu
+.\scripts\setup.ps1 -Dev          # Windows
 ```
 
-## Build
+## Hinweis
 
-```bash
-npm run dist          # Host-OS-Targets
-npm run dist:win      # Windows NSIS + portable
-npm run dist:linux    # AppImage + deb
-```
-
-Artefakte: `release/`.
+- Branch bis zum Merge: `cursor/fax-inbox-mvp-df4f` (danach reicht `main`).
+- Cross-Build (Windows-Installer unter Linux) ist nicht vorgesehen — jeweils auf dem Ziel-OS ausführen.
 
 ## Nutzung
 
-1. Faxordner festlegen (Setup oder Zahnrad → Einstellungen).
-2. Neue PDFs erscheinen im **Posteingang**, gruppiert nach **Heute / Gestern / Vorgestern / Später**.
-3. Klick öffnet die Vorschau und markiert als gelesen.
-4. Bei neuer Datei: **Systembenachrichtigung** (Windows-Toast / Ubuntu-Notification). Klick oder **App öffnen** bringt dich direkt zum neuen Fax.
-5. **Archivieren** → `Faxordner/Archiv/` · **Umbenennen** ändert den Dateinamen.
-6. Vorschau: Zoom (+/−), **Anpassen**, **Drehen**.
-7. **Drucken** / **Löschen** (Löschen mit Bestätigung).
-8. Tray zeigt Ungelesen-Anzahl.
-
-### Tastatur
-
-| Taste | Aktion |
-| --- | --- |
-| ↑ / ↓ | Liste navigieren |
-| Entf | Löschen (mit Bestätigung) |
-| Strg+P | Drucken |
-| Strg+R | Umbenennen |
-
-Ungelesen-Status: `userData/inbox-state.json`.
+1. Faxordner festlegen (Setup oder Zahnrad).
+2. PDFs erscheinen im Posteingang (Heute / Gestern / Vorgestern / Später).
+3. Systembenachrichtigung bei neuem Fax → Klick öffnet die App beim Fax.
+4. Vorschau: Zoom, Anpassen, Drehen · Archivieren · Umbenennen · Drucken · Löschen.
 
 ## Nicht im MVP
 
-OCR, E-Mail-Weiterleitung, Scanordner, TIFF, Cloud-Sync.
+OCR, E-Mail, Scanordner, TIFF, Cloud-Sync.
