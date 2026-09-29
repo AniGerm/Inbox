@@ -40,13 +40,15 @@ fax-inbox
 
 **Git fehlt?** Zuerst [Git for Windows](https://git-scm.com/download/win) installieren, danach PowerShell **neu öffnen**.
 
-In **PowerShell**:
+In **PowerShell** oder **cmd**:
 
 ```powershell
 git clone https://github.com/AniGerm/Inbox.git
 cd Inbox
-.\install.ps1
+.\install.cmd
 ```
+
+(`install.cmd` umgeht die PowerShell-ExecutionPolicy. Alternativ: `Set-ExecutionPolicy -Scope Process Bypass`, dann `.\install.ps1`.)
 
 Das Skript:
 
@@ -54,7 +56,7 @@ Das Skript:
 2. baut **NSIS-Setup** + portable EXE
 3. startet die **Setup-.exe** → Startmenü- und Desktop-Verknüpfung
 
-**Ohne Git:** ZIP von https://github.com/AniGerm/Inbox/archive/refs/heads/main.zip laden → entpacken → in dem Ordner `.\install.ps1` ausführen.
+**Ohne Git:** ZIP von https://github.com/AniGerm/Inbox/archive/refs/heads/main.zip laden → entpacken → in dem Ordner `.\install.cmd` ausführen.
 
 ## Was du bekommst
 
