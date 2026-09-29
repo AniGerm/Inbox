@@ -9,6 +9,7 @@ import {
 } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
+import { spawn } from 'node:child_process'
 import { FaxWatcher } from './watcher'
 import { loadSettings, saveSettings } from './store'
 import {
@@ -221,25 +222,93 @@ function applyAutostart(enabled: boolean): void {
 }
 
 
-/** Print the PDF pages already rendered in the main window (@media print hides chrome). */
-async function printPreviewWindow(): Promise<void> {
+function runCommand(cmd: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { windowsHide: true })
+    let stderr = ''
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString()
+    })
+    child.on('error', reject)
+    child.on('close', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(stderr.trim() || `Befehl fehlgeschlagen (${code})`))
+    })
+  })
+}
+
+/** Windows fallback when Electron reports "Invalid printer settings". */
+async function printViaWindowsShell(filePath: string): Promise<void> {
+  const escaped = filePath.replace(/'/g, "''")
+  await runCommand('powershell.exe', [
+    '-NoProfile',
+    '-NonInteractive',
+    '-Command',
+    `Start-Process -LiteralPath '${escaped}' -Verb Print`,
+  ])
+}
+
+/**
+ * Print PDF preview. On Windows Electron often fails with
+ * "Invalid printer settings" if no valid deviceName is passed —
+ * pick the default printer, then fall back to the Shell Print verb.
+ */
+async function printPreviewWindow(filePath?: string): Promise<void> {
   if (!mainWindow || mainWindow.isDestroyed()) {
     throw new Error('Fenster nicht bereit')
   }
   focusMainWindow(mainWindow)
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error('Druckdialog-Timeout — bitte erneut versuchen'))
-    }, 120_000)
-    mainWindow!.webContents.print({ silent: false, printBackground: true }, (success, failureReason) => {
-      clearTimeout(timer)
-      if (!success && failureReason !== 'cancelled') {
-        reject(new Error(failureReason || 'Druck fehlgeschlagen'))
-      } else {
-        resolve()
-      }
+
+  const options: Electron.WebContentsPrintOptions = {
+    silent: false,
+    printBackground: true,
+  }
+
+  try {
+    const printers = await mainWindow.webContents.getPrintersAsync()
+    const preferred =
+      printers.find((p) => p.isDefault) ??
+      printers.find((p) => p.status === 0) ??
+      printers[0]
+    if (preferred?.name) {
+      options.deviceName = preferred.name
+    }
+  } catch (err) {
+    console.warn('Druckerliste nicht lesbar:', err)
+  }
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error('Druckdialog-Timeout — bitte erneut versuchen'))
+      }, 120_000)
+      mainWindow!.webContents.print(options, (success, failureReason) => {
+        clearTimeout(timer)
+        if (!success && failureReason !== 'cancelled') {
+          reject(new Error(failureReason || 'Druck fehlgeschlagen'))
+        } else {
+          resolve()
+        }
+      })
     })
-  })
+    return
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.warn('Electron-Druck fehlgeschlagen:', msg)
+    if (process.platform === 'win32' && filePath && fs.existsSync(filePath)) {
+      try {
+        await printViaWindowsShell(path.resolve(filePath))
+        return
+      } catch (shellErr) {
+        console.warn('Shell-Druck fehlgeschlagen:', shellErr)
+      }
+      // Last resort: open in default PDF viewer so the user can print there
+      const openErr = await shell.openPath(path.resolve(filePath))
+      if (!openErr) return
+      throw new Error(openErr)
+    }
+    throw err instanceof Error ? err : new Error(msg)
+  }
 }
 
 function registerIpc(): void {
@@ -311,8 +380,8 @@ function registerIpc(): void {
     return watcher.rename(filePath, newName)
   })
 
-  ipcMain.handle('print-preview', async () => {
-    await printPreviewWindow()
+  ipcMain.handle('print-preview', async (_e, filePath?: string) => {
+    await printPreviewWindow(typeof filePath === 'string' ? filePath : undefined)
     return true
   })
 

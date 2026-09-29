@@ -143,7 +143,7 @@ export default function Inbox({
       return
     }
     try {
-      await window.faxInbox.printPreview()
+      await window.faxInbox.printPreview(selectedVisible.path)
     } catch (err) {
       console.error(err)
       const msg = err instanceof Error ? err.message : 'Druck fehlgeschlagen'
