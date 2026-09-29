@@ -62,6 +62,7 @@ cd Inbox
 (`install.cmd` umgeht die PowerShell-ExecutionPolicy. Alternativ: `Set-ExecutionPolicy -Scope Process Bypass`, dann `.\install.ps1`.)
 
 Nicht unter `C:\Windows\System32` arbeiten — z. B. `C:\Users\<Name>\Inbox` verwenden.
+Unter System32 schlägt der Windows-Installer fehl (`StdUtils.nsh` / NSIS wegen WOW64-Umleitung).
 
 Das Skript (braucht Node/npm bereits):
 

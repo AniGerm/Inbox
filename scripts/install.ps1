@@ -11,6 +11,15 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 
+# Building under System32 breaks NSIS (WOW64 redirection -> missing StdUtils.nsh).
+$rootFull = [System.IO.Path]::GetFullPath($Root)
+if ($rootFull -match '(?i)[\\/]Windows[\\/]System32[\\/]') {
+  Write-Host "[X] Bitte nicht unter C:\Windows\System32 installieren/bauen." -ForegroundColor Red
+  Write-Host "    Kopiere das Projekt nach z.B. C:\Users\$env:USERNAME\Inbox und starte .\install.cmd erneut." -ForegroundColor Yellow
+  Write-Host "    Aktueller Pfad: $rootFull" -ForegroundColor Yellow
+  exit 1
+}
+
 function Write-Ok($msg)   { Write-Host "[OK] $msg" -ForegroundColor Green }
 function Write-Warn($msg) { Write-Host "! $msg" -ForegroundColor Yellow }
 function Write-Err($msg)  { Write-Host "[X] $msg" -ForegroundColor Red }
