@@ -203,11 +203,17 @@ function startWatcherFromSettings(): void {
 
 function applyAutostart(enabled: boolean): void {
   try {
+    // Windows: show window on login (openAsHidden is mainly a macOS concept).
+    // Only register when packaged — otherwise Start Menu / reboot can't find a real install.
+    if (!app.isPackaged) {
+      console.warn('Autostart nur in der installierten App verfügbar')
+      return
+    }
     app.setLoginItemSettings({
       openAtLogin: enabled,
-      openAsHidden: true,
+      openAsHidden: process.platform === 'darwin',
       path: process.execPath,
-      args: app.isPackaged ? [] : [path.resolve(process.argv[1] ?? '.')],
+      args: [],
     })
   } catch (err) {
     console.error('Autostart konnte nicht gesetzt werden:', err)

@@ -149,9 +149,42 @@ Write-Host "Hinweis: Die installierte App enthält Electron bereits — Node wir
 Write-Host ""
 
 if (-not $NoLaunch) {
-  Write-Info "Starte Installer..."
+  Write-Info "Starte Setup-Assistenten..."
+  Write-Host "  Bitte im Fenster: Weiter/Installieren durchklicken (nicht nur schliessen)." -ForegroundColor Yellow
   Start-Process -FilePath $setup.FullName -Wait
-  Write-Ok "Installer beendet. Fax Inbox findest du im Startmenü."
+
+  # Verify real install (Start Menu + installed exe) — portable/dev launches leave no shortcuts.
+  $candidates = @(
+    "$env:LOCALAPPDATA\Programs\fax-inbox\Fax Inbox.exe",
+    "$env:LOCALAPPDATA\Programs\Fax Inbox\Fax Inbox.exe",
+    "$env:ProgramFiles\Fax Inbox\Fax Inbox.exe",
+    "${env:ProgramFiles(x86)}\Fax Inbox\Fax Inbox.exe"
+  )
+  $installed = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+  $startMenuDirs = @(
+    "$env:APPDATA\Microsoft\Windows\Start Menu\Programs",
+    "$env:ProgramData\Microsoft\Windows\Start Menu\Programs"
+  )
+  $shortcut = $null
+  foreach ($dir in $startMenuDirs) {
+    if (-not (Test-Path $dir)) { continue }
+    $shortcut = Get-ChildItem -Path $dir -Filter "*Fax*Inbox*.lnk" -Recurse -ErrorAction SilentlyContinue |
+      Select-Object -First 1
+    if ($shortcut) { break }
+  }
+
+  if ($installed -or $shortcut) {
+    Write-Ok "Installation erkannt."
+    if ($installed) { Write-Ok "App: $installed" }
+    if ($shortcut) { Write-Ok "Startmenü: $($shortcut.FullName)" }
+    Write-Host "Zum Starten: Startmenü öffnen und nach „Fax Inbox“ suchen." -ForegroundColor Cyan
+  } else {
+    Write-Warn "Kein Startmenü-Eintrag / keine installierte EXE gefunden."
+    Write-Warn "Vermutlich wurde der Setup-Assistent abgebrochen — oder nur die App kurz gestartet."
+    Write-Host "Bitte erneut ausführen und den Assistenten zu Ende klicken:" -ForegroundColor Yellow
+    Write-Host "  $($setup.FullName)" -ForegroundColor Yellow
+  }
 } else {
   Write-Info "Überspringe Launch (-NoLaunch). Bitte $($setup.Name) manuell ausführen."
 }

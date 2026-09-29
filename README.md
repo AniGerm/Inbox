@@ -102,7 +102,14 @@ Das Skript:
 2. baut **NSIS-Setup** + portable EXE nach `release\`
 3. startet die **Setup-.exe** → Einträge in **Startmenü** und optional **Desktop**
 
-Danach **Fax Inbox** im Startmenü öffnen.
+Danach den **Setup-Assistenten zu Ende klicken** (Weiter → Installieren).  
+Erst dann erscheinen **Startmenü**- und optional **Desktop**-Verknüpfung.
+
+App finden: Startmenü → „Fax Inbox“ — typischer Pfad:
+
+`%LOCALAPPDATA%\Programs\fax-inbox\Fax Inbox.exe`
+
+Wenn die App einmal kurz aufging, aber nach Neustart **nicht** im Startmenü ist: Setup erneut aus `release\Fax-Inbox-Setup-*.exe` ausführen und den Assistenten fertig durchklicken. Autostart erst **nach** echter Installation setzen.
 
 ---
 
