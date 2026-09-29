@@ -9,8 +9,6 @@ import {
 } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
-import { spawn } from 'node:child_process'
-import { pathToFileURL } from 'node:url'
 import { FaxWatcher } from './watcher'
 import { loadSettings, saveSettings } from './store'
 import {
@@ -223,67 +221,18 @@ function applyAutostart(enabled: boolean): void {
 }
 
 
-function runCommand(cmd: string, args: string[]): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { windowsHide: true })
-    let stderr = ''
-    child.stderr?.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString()
-    })
-    child.on('error', reject)
-    child.on('close', (code) => {
-      if (code === 0) resolve()
-      else reject(new Error(stderr.trim() || `Befehl fehlgeschlagen (${code})`))
-    })
-  })
-}
-
-/** Windows: Shell Print verb (zuverlässiger Druckdialog als hidden BrowserWindow). */
-async function printPdfWindowsShell(filePath: string): Promise<void> {
-  const ps = [
-    '-NoProfile',
-    '-NonInteractive',
-    '-Command',
-    `Start-Process -LiteralPath ${JSON.stringify(filePath)} -Verb Print`,
-  ]
-  await runCommand('powershell.exe', ps)
-}
-
-async function printPdfElectron(filePath: string, parent: BrowserWindow | null): Promise<void> {
-  const printWin = new BrowserWindow({
-    show: false,
-    parent: parent && !parent.isDestroyed() ? parent : undefined,
-    modal: !!(parent && !parent.isDestroyed()),
-    autoHideMenuBar: true,
-    webPreferences: {
-      sandbox: false,
-      contextIsolation: true,
-    },
-  })
-
-  const url = pathToFileURL(filePath).href
-  await printWin.loadURL(url)
-  await new Promise<void>((resolve, reject) => {
-    const fail = (_e: unknown, code: number, desc: string) => {
-      reject(new Error(`PDF laden fehlgeschlagen: ${desc} (${code})`))
-    }
-    if (printWin.webContents.isLoading()) {
-      printWin.webContents.once('did-finish-load', () => resolve())
-      printWin.webContents.once('did-fail-load', fail)
-    } else {
-      resolve()
-    }
-  })
-
-  await new Promise((r) => setTimeout(r, 400))
-
+/** Print the PDF pages already rendered in the main window (@media print hides chrome). */
+async function printPreviewWindow(): Promise<void> {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    throw new Error('Fenster nicht bereit')
+  }
+  focusMainWindow(mainWindow)
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error('Druckdialog-Timeout — bitte erneut versuchen'))
     }, 120_000)
-    printWin.webContents.print({ silent: false, printBackground: true }, (success, failureReason) => {
+    mainWindow!.webContents.print({ silent: false, printBackground: true }, (success, failureReason) => {
       clearTimeout(timer)
-      if (!printWin.isDestroyed()) printWin.close()
       if (!success && failureReason !== 'cancelled') {
         reject(new Error(failureReason || 'Druck fehlgeschlagen'))
       } else {
@@ -291,26 +240,6 @@ async function printPdfElectron(filePath: string, parent: BrowserWindow | null):
       }
     })
   })
-}
-
-async function printPdfFile(filePath: string, parent: BrowserWindow | null): Promise<void> {
-  const resolved = path.resolve(filePath)
-  if (!fs.existsSync(resolved)) {
-    throw new Error('Datei nicht gefunden')
-  }
-
-  if (process.platform === 'win32') {
-    try {
-      await printPdfWindowsShell(resolved)
-      return
-    } catch (shellErr) {
-      console.warn('Windows Shell-Druck fehlgeschlagen, versuche Electron:', shellErr)
-      await printPdfElectron(resolved, parent)
-      return
-    }
-  }
-
-  await printPdfElectron(resolved, parent)
 }
 
 function registerIpc(): void {
@@ -382,8 +311,8 @@ function registerIpc(): void {
     return watcher.rename(filePath, newName)
   })
 
-  ipcMain.handle('print-fax', async (_e, filePath: string) => {
-    await printPdfFile(filePath, mainWindow)
+  ipcMain.handle('print-preview', async () => {
+    await printPreviewWindow()
     return true
   })
 

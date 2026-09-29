@@ -81,7 +81,6 @@ export default function Inbox({
 }: Props) {
   const [view, setView] = useState<ViewMode>('inbox')
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
-  const [printing, setPrinting] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -139,15 +138,16 @@ export default function Inbox({
 
   const print = useCallback(async () => {
     if (!selectedVisible) return
-    setPrinting(true)
+    if (!document.querySelector('.preview-pages canvas')) {
+      window.alert('Vorschau wird noch geladen — bitte kurz warten und erneut drucken.')
+      return
+    }
     try {
-      await window.faxInbox.printFax(selectedVisible.path)
+      await window.faxInbox.printPreview()
     } catch (err) {
       console.error(err)
       const msg = err instanceof Error ? err.message : 'Druck fehlgeschlagen'
       window.alert(`Drucken fehlgeschlagen:\n\n${msg}`)
-    } finally {
-      setPrinting(false)
     }
   }, [selectedVisible])
 
@@ -359,7 +359,6 @@ export default function Inbox({
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={printing}
                   onClick={() => void print()}
                 >
                   Drucken

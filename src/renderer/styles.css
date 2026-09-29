@@ -640,3 +640,56 @@ button {
     border-bottom: 1px solid var(--border);
   }
 }
+
+/* —— Print (PDF preview only) —— */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  .topbar,
+  .list-pane,
+  .action-bar,
+  .preview-toolbar,
+  .settings-backdrop,
+  .settings-panel,
+  .rename-backdrop,
+  .rename-panel {
+    display: none !important;
+  }
+
+  .app,
+  .shell,
+  .preview-pane,
+  .preview-stack,
+  .preview-body {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .preview-body {
+    padding: 0 !important;
+  }
+
+  .preview-pages {
+    gap: 0 !important;
+  }
+
+  .preview-body canvas {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .preview-body canvas:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+}

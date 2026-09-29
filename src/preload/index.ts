@@ -25,7 +25,7 @@ const api = {
   restoreFax: (filePath: string): Promise<PathResult> => ipcRenderer.invoke('restore-fax', filePath),
   renameFax: (filePath: string, newName: string): Promise<PathResult> =>
     ipcRenderer.invoke('rename-fax', filePath, newName),
-  printFax: (filePath: string): Promise<boolean> => ipcRenderer.invoke('print-fax', filePath),
+  printPreview: (): Promise<boolean> => ipcRenderer.invoke('print-preview'),
   readPdf: (filePath: string): Promise<ArrayBuffer> => ipcRenderer.invoke('read-pdf', filePath),
   revealInFolder: (filePath: string): Promise<void> =>
     ipcRenderer.invoke('reveal-in-folder', filePath),
