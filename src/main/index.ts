@@ -18,6 +18,13 @@ import {
 } from './notifications'
 import type { AppSettings, FaxItem } from '../shared/types'
 
+// Linux: Chromium setuid/userns sandbox often aborts before any window on
+// Ubuntu (AppImage/AppArmor). Must be set before app ready.
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('no-sandbox')
+  app.commandLine.appendSwitch('disable-gpu-sandbox')
+}
+
 // Required on Windows so system toasts are associated with this app
 if (process.platform === 'win32') {
   app.setAppUserModelId('com.faxinbox.app')
@@ -76,8 +83,28 @@ function createWindow(): BrowserWindow {
     },
   })
 
-  win.once('ready-to-show', () => {
-    win.show()
+  const reveal = () => {
+    if (!win.isDestroyed() && !win.isVisible()) win.show()
+  }
+
+  win.once('ready-to-show', reveal)
+
+  // If ready-to-show never fires (load hang), still surface the window.
+  const showFallback = setTimeout(reveal, 2500)
+
+  win.webContents.on('did-finish-load', () => {
+    clearTimeout(showFallback)
+    reveal()
+  })
+
+  win.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    clearTimeout(showFallback)
+    console.error('Window load failed:', code, desc, url)
+    reveal()
+    void dialog.showErrorBox(
+      'Fax Inbox',
+      `Die Oberfläche konnte nicht geladen werden.\n\n${desc} (${code})`,
+    )
   })
 
   win.on('close', (e) => {
@@ -295,36 +322,49 @@ function registerIpc(): void {
   ipcMain.handle('get-platform', () => process.platform)
 }
 
-app.whenReady().then(() => {
-  // Ensure single instance
-  const gotLock = app.requestSingleInstanceLock()
-  if (!gotLock) {
-    app.quit()
-    return
-  }
-
+// Single-instance lock must run before ready; otherwise a second start can
+// quit silently while an invisible first process still holds the lock.
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.exit(0)
+} else {
   app.on('second-instance', () => {
-    focusMainWindow(mainWindow)
-  })
-
-  registerIpc()
-  mainWindow = createWindow()
-
-  tray = new Tray(loadTrayIconFromFile(0))
-  tray.on('click', () => {
     focusMainWindow(mainWindow)
     mainWindow?.webContents.send('focus-newest')
   })
-  updateTray()
 
-  const settings = loadSettings()
-  applyAutostart(settings.autostart)
-  startWatcherFromSettings()
+  app.whenReady().then(() => {
+    registerIpc()
+    mainWindow = createWindow()
 
-  app.on('activate', () => {
-    focusMainWindow(mainWindow)
+    try {
+      tray = new Tray(loadTrayIconFromFile(0))
+      tray.on('click', () => {
+        focusMainWindow(mainWindow)
+        mainWindow?.webContents.send('focus-newest')
+      })
+      updateTray()
+    } catch (err) {
+      // GNOME without AppIndicator: tray may be unavailable — window still works.
+      console.error('Tray konnte nicht erstellt werden:', err)
+    }
+
+    const settings = loadSettings()
+    applyAutostart(settings.autostart)
+    startWatcherFromSettings()
+
+    app.on('activate', () => {
+      focusMainWindow(mainWindow)
+    })
+  }).catch((err) => {
+    console.error('App-Start fehlgeschlagen:', err)
+    dialog.showErrorBox(
+      'Fax Inbox',
+      `Start fehlgeschlagen:\n\n${err instanceof Error ? err.message : String(err)}`,
+    )
+    app.exit(1)
   })
-})
+}
 
 app.on('before-quit', () => {
   isQuitting = true

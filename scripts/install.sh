@@ -122,11 +122,14 @@ ensure_electron_deps() {
     return
   fi
 
+  # AppImage needs FUSE2 on Ubuntu 22.04+ (fuse3 alone is not enough).
+  # libasound2t64 (noble+) may fall back to libasound2 / libfuse2t64 below.
   local pkgs=(
     libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6
     xdg-utils libatspi2.0-0 libsecret-1-0 libasound2t64
+    libgbm1 libdrm2 libxkbcommon0 libxrandr2 libxcomposite1
+    libxdamage1 libxfixes3 libcups2 libfuse2
   )
-  # libasound2t64 (noble+) fallback to libasound2
   local missing=()
   for p in "${pkgs[@]}"; do
     if ! dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q "install ok installed"; then
@@ -139,9 +142,11 @@ ensure_electron_deps() {
     info "Installiere Electron-Systempakete: ${missing[*]}"
     run_root apt-get update -y
     if ! run_root apt-get install -y "${missing[@]}"; then
-      warn "Einige Pakete fehlgeschlagen — versuche libasound2 statt t64…"
+      warn "Einige Pakete fehlgeschlagen — versuche Fallback-Namen…"
       run_root apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 \
-        xdg-utils libatspi2.0-0 libsecret-1-0 libasound2 || true
+        xdg-utils libatspi2.0-0 libsecret-1-0 libasound2 libgbm1 libdrm2 \
+        libxkbcommon0 libfuse2 || \
+      run_root apt-get install -y libfuse2t64 || true
     fi
   fi
   ok "Electron-Systempakete geprüft"
@@ -197,11 +202,38 @@ echo "  CLI:    fax-inbox"
 echo
 
 if [[ "$SKIP_LAUNCH" -eq 0 ]]; then
+  LOG_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/fax-inbox"
+  mkdir -p "$LOG_DIR"
+  LOG="$LOG_DIR/launch.log"
+
+  launch_and_verify() {
+    local cmd=("$@")
+    info "Starte Fax Inbox… (Log: $LOG)"
+    {
+      echo "=== $(date -Iseconds) launch: ${cmd[*]} ==="
+      echo "DISPLAY=${DISPLAY-} WAYLAND_DISPLAY=${WAYLAND_DISPLAY-} XDG_SESSION_TYPE=${XDG_SESSION_TYPE-}"
+      "${cmd[@]}"
+      echo "exit=$?"
+    } >>"$LOG" 2>&1 &
+    local pid=$!
+    sleep 2
+    if ! kill -0 "$pid" 2>/dev/null; then
+      wait "$pid" 2>/dev/null || true
+      err "App ist sofort wieder beendet — vermutlich fehlende Libs oder Sandbox."
+      echo "---- letzte Logzeilen ----" >&2
+      tail -n 50 "$LOG" >&2 || true
+      echo "-------------------------" >&2
+      warn "Manuell im Terminal starten: ${cmd[*]}"
+      warn "Oder Log prüfen: $LOG"
+      return 1
+    fi
+    ok "Fax Inbox läuft (PID $pid) — Fenster sollte sichtbar sein"
+    return 0
+  }
+
   if command -v fax-inbox >/dev/null 2>&1; then
-    info "Starte Fax Inbox…"
-    nohup fax-inbox >/dev/null 2>&1 &
+    launch_and_verify fax-inbox || true
   elif [[ -n "$APPIMAGE" ]]; then
-    info "Starte AppImage…"
-    nohup "$HOME/Applications/$(basename "$APPIMAGE")" >/dev/null 2>&1 &
+    launch_and_verify "$HOME/Applications/$(basename "$APPIMAGE")" || true
   fi
 fi

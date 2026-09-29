@@ -72,6 +72,31 @@ Ohne Git: auf GitHub → Code → Download ZIP (Branch **main**) → entpacken �
 
 - Cross-Build (Windows-Installer unter Linux) ist nicht vorgesehen — jeweils auf dem Ziel-OS ausführen.
 
+## Ubuntu: App startet nicht / klicken tut nichts
+
+1. Im Terminal starten (zeigt Fehler statt still zu sterben):
+
+```bash
+fax-inbox
+# oder
+~/Applications/Fax-Inbox-*.AppImage
+```
+
+2. Log vom Installer/Start prüfen:
+
+```bash
+tail -n 80 ~/.local/share/fax-inbox/launch.log
+```
+
+3. Neu installieren (holt fehlende Libs inkl. FUSE für AppImage und startet mit sichtbarem Log):
+
+```bash
+cd ~/Inbox   # bzw. dein Clone-Pfad
+./install.sh
+```
+
+Häufige Ursachen: fehlendes `libfuse2` (AppImage), Chromium-Sandbox, oder ein unsichtbarer Hintergrundprozess — `pkill -f fax-inbox` und danach erneut starten.
+
 ## Nutzung
 
 1. Faxordner festlegen (Setup oder Zahnrad).
