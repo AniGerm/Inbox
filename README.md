@@ -41,14 +41,14 @@ fax-inbox
 
 ### Windows
 
-**Wichtig:** Das Projekt **nicht** unter `C:\Windows\System32` ablegen.  
-Dort schlägt der Installer fehl (`StdUtils.nsh` / NSIS wegen WOW64).  
-Richtig z. B.: `C:\Users\<DeinName>\Inbox`
+**Wichtig:** Immer unter dem **Benutzerordner** arbeiten, nie unter `C:\Windows\System32`.
+
+Richtig: `C:\Users\<DeinName>\Inbox` (= `%USERPROFILE%\Inbox`)
 
 #### Schritt 1 — Node.js + npm (Pflicht)
 
-1. [Node.js LTS](https://nodejs.org/) herunterladen und installieren (enthält **npm**).
-2. PowerShell **schließen und neu öffnen**.
+1. [Node.js LTS](https://nodejs.org/) installieren (enthält **npm**).
+2. PowerShell **neu öffnen**.
 3. Prüfen:
 
 ```powershell
@@ -58,58 +58,63 @@ npm -v
 
 Beide Befehle müssen eine Version zeigen (**Node ≥ 20**).
 
-#### Schritt 2 — Projekt holen
+#### Schritt 2 — Frisch nach `%USERPROFILE%` klonen
 
-**Variante A — mit Git** (empfohlen):  
-Falls `git` fehlt: zuerst [Git for Windows](https://git-scm.com/download/win) installieren, PowerShell neu öffnen.
+Falls `git` fehlt: [Git for Windows](https://git-scm.com/download/win), dann PowerShell neu öffnen.
 
 ```powershell
 cd $env:USERPROFILE
+Remove-Item -Recurse -Force .\Inbox -ErrorAction SilentlyContinue
 git clone https://github.com/AniGerm/Inbox.git
-cd Inbox
+cd .\Inbox
+git checkout main
+git pull origin main
+dir
 ```
 
-**Variante B — ohne Git (ZIP):**
+Nach dem Clone **müssen** im Hauptverzeichnis u. a. stehen:
 
-1. ZIP laden: https://github.com/AniGerm/Inbox/archive/refs/heads/main.zip
-2. Entpacken nach z. B. `C:\Users\<DeinName>\Inbox`
-3. In diesen Ordner wechseln:
+- `install.cmd`  ← Start hier
+- `install.ps1`
+- `package.json`
+- Ordner `scripts\`, `src\`, `resources\`
+
+Fehlt `install.cmd`:
+
+```powershell
+git fetch origin main
+git checkout origin/main -- install.cmd install.ps1
+dir .\install.cmd
+```
+
+**Ohne Git (ZIP):** https://github.com/AniGerm/Inbox/archive/refs/heads/main.zip  
+→ entpacken nach `%USERPROFILE%\Inbox` → dort `dir` prüfen (gleiche Dateien).
+
+#### Schritt 3 — Installieren
 
 ```powershell
 cd $env:USERPROFILE\Inbox
-# bzw. der entpackte Ordnername, z. B. Inbox-main
-```
-
-#### Schritt 3 — Bauen & installieren
-
-Im Projektordner (nicht System32):
-
-```powershell
 .\install.cmd
 ```
 
-`install.cmd` umgeht die PowerShell-ExecutionPolicy.  
-Alternativ:
+Alternativen, falls `install.cmd` blockiert wird:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\install.ps1
+.\scripts\install.cmd
+# oder:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1
 ```
 
 Das Skript:
 
-1. prüft Node.js / npm (Fallback: `winget`, falls Node fehlt)
-2. baut **NSIS-Setup** + portable EXE nach `release\`
-3. startet die **Setup-.exe** → Einträge in **Startmenü** und optional **Desktop**
+1. bricht ab, wenn der Ordner unter `System32` liegt
+2. prüft Node.js / npm
+3. baut den **NSIS-Setup** nach `release\`
+4. startet den **Setup-Assistenten**
 
-Danach den **Setup-Assistenten zu Ende klicken** (Weiter → Installieren).  
-Erst dann erscheinen **Startmenü**- und optional **Desktop**-Verknüpfung.
-
-App finden: Startmenü → „Fax Inbox“ — typischer Pfad:
-
-`%LOCALAPPDATA%\Programs\fax-inbox\Fax Inbox.exe`
-
-Wenn die App einmal kurz aufging, aber nach Neustart **nicht** im Startmenü ist: Setup erneut aus `release\Fax-Inbox-Setup-*.exe` ausführen und den Assistenten fertig durchklicken. Autostart erst **nach** echter Installation setzen.
+Im Assistenten: **Weiter → Installieren → Fertig** durchklicken.  
+Danach Startmenü → **„Fax Inbox“**  
+Installationspfad typisch: `%LOCALAPPDATA%\Programs\fax-inbox\Fax Inbox.exe`
 
 ---
 
