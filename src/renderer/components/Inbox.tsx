@@ -144,6 +144,8 @@ export default function Inbox({
       await window.faxInbox.printFax(selectedVisible.path)
     } catch (err) {
       console.error(err)
+      const msg = err instanceof Error ? err.message : 'Druck fehlgeschlagen'
+      window.alert(`Drucken fehlgeschlagen:\n\n${msg}`)
     } finally {
       setPrinting(false)
     }
