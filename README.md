@@ -4,53 +4,99 @@ Desktop-Inbox für eingehende Fax-PDFs (z. B. Ricoh IM350F). Überwacht den Faxo
 
 **Plattformen:** Windows und Ubuntu · **Stack:** Electron, Vite, React, TypeScript · **Format:** nur PDF
 
-## Voraussetzungen
+## Einfach installieren (empfohlen)
 
-- Node.js 20+ (empfohlen 22)
-- npm 10+
+Es gibt Setup-Skripte, die **Node/npm prüfen**, fehlende Hinweise ausgeben und **`npm install`** ausführen.
 
-## Entwicklung
+### Ubuntu / Linux
+
+```bash
+git clone https://github.com/AniGerm/Inbox.git
+cd Inbox
+./scripts/setup.sh
+npm run dev
+```
+
+Optional:
+
+```bash
+./scripts/setup.sh --dev      # Setup + App starten
+./scripts/setup.sh --build    # Setup + Linux-Installer (AppImage + .deb) nach release/
+```
+
+Danach dauerhaft installieren (nach `--build` oder `npm run dist:linux`):
+
+- **AppImage:** Datei in `release/` ausführbar machen und doppelklicken  
+  `chmod +x release/Fax*.AppImage && ./release/Fax*.AppImage`
+- **deb:** `sudo apt install ./release/fax-inbox_*.deb`
+
+Falls das Skript Electron-Systempakete bemängelt:
+
+```bash
+sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libsecret-1-0
+```
+
+### Windows
+
+In **PowerShell** im Repo:
+
+```powershell
+git clone https://github.com/AniGerm/Inbox.git
+cd Inbox
+.\scripts\setup.ps1
+npm run dev
+```
+
+Optional:
+
+```powershell
+.\scripts\setup.ps1 -Dev     # Setup + App starten
+.\scripts\setup.ps1 -Build   # Setup + Windows-Installer (NSIS + portable) nach release\
+```
+
+Installer: in `release\` die **Setup-.exe** (NSIS) ausführen oder die **portable .exe** starten.
+
+> Node.js LTS (≥ 20) muss vorher drauf sein: https://nodejs.org/ oder `winget install OpenJS.NodeJS.LTS`
+
+### Was die Skripte prüfen
+
+| Check | setup.sh | setup.ps1 |
+| --- | --- | --- |
+| Node.js ≥ 20 | ja | ja |
+| npm vorhanden | ja | ja |
+| `npm install` | ja | ja |
+| Linux Electron-Libs (Hinweis) | ja | — |
+| Display-Session (Hinweis) | ja | — |
+| Installer bauen | `--build` | `-Build` |
+
+**Nicht** automatisch: systemweite Node-Installation (dafür sudo/winget nötig) und Cross-Build (Windows-Installer auf Ubuntu braucht Wine).
+
+## Entwicklung (ohne Skript)
 
 ```bash
 npm install
 npm run dev
 ```
 
-Beim ersten Start den Faxordner wählen. Die App läuft mit Hot-Reload über Vite.
-
 ## Build
 
-Alle Targets (je nach Host-OS eingeschränkt):
-
 ```bash
-npm run dist
+npm run dist          # Host-OS-Targets
+npm run dist:win      # Windows NSIS + portable
+npm run dist:linux    # AppImage + deb
 ```
 
-Nur Windows (NSIS + portable):
-
-```bash
-npm run dist:win
-```
-
-Nur Linux (AppImage + deb):
-
-```bash
-npm run dist:linux
-```
-
-Artefakte liegen unter `release/`.
-
-> Windows-Installer unter Linux bauen erfordert `wine` (optional). Auf Windows können Linux-Targets mit Docker/`electron-builder` gebaut werden; am zuverlässigsten ist der jeweilige Host.
+Artefakte: `release/`.
 
 ## Nutzung
 
 1. Faxordner festlegen (Setup oder Zahnrad → Einstellungen).
 2. Neue PDFs erscheinen im **Posteingang** (neueste zuerst), ungelesen mit Punkt.
 3. Klick öffnet die Vorschau und markiert als gelesen.
-4. **Archivieren** verschiebt die Datei nach `Faxordner/Archiv/` · **Umbenennen** ändert den Dateinamen.
-5. In der Vorschau: Zoom (+/−), **Anpassen** (Seitenbreite), **Drehen**.
-6. **Drucken** öffnet den Systemdruckdialog · **Löschen** fragt nach.
-7. Tray-Icon zeigt ungelesene Anzahl; Klick öffnet das Fenster.
+4. **Archivieren** → `Faxordner/Archiv/` · **Umbenennen** ändert den Dateinamen.
+5. Vorschau: Zoom (+/−), **Anpassen**, **Drehen**.
+6. **Drucken** / **Löschen** (Löschen mit Bestätigung).
+7. Tray zeigt Ungelesen-Anzahl.
 
 ### Tastatur
 
@@ -61,13 +107,7 @@ Artefakte liegen unter `release/`.
 | Strg+P | Drucken |
 | Strg+R | Umbenennen |
 
-### Einstellungen
-
-- Faxordner-Pfad
-- Benachrichtigungen an/aus
-- Autostart (Windows / Ubuntu)
-
-Ungelesen-Status liegt in `userData/inbox-state.json`.
+Ungelesen-Status: `userData/inbox-state.json`.
 
 ## Nicht im MVP
 
