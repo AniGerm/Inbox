@@ -1,4 +1,4 @@
-﻿﻿# Fax Inbox — Dev-Setup (Windows)
+﻿# Fax Inbox — Dev-Setup (Windows)
 # Für Fire-and-forget inkl. Startmenü: .\install.ps1
 param(
   [switch]$Dev,

@@ -1,4 +1,4 @@
-﻿﻿# Fax Inbox — Fire-and-forget Installation (Windows)
+﻿# Fax Inbox — Fire-and-forget Installation (Windows)
 # Installiert bei Bedarf Node.js (winget), baut NSIS-Installer + portable EXE
 # und startet die Setup-.exe (Startmenü + Desktop-Verknüpfung).
 # Die fertige App braucht zur Laufzeit KEIN Node.
