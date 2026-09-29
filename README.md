@@ -166,6 +166,7 @@ Häufige Ursachen: fehlendes `libfuse2` (AppImage), Chromium-Sandbox, oder ein u
 | `MissingEndCurlyBrace` / kaputte Zeichen | veraltetes Skript | `git pull` bzw. frisches ZIP von **main** |
 | `StdUtils.nsh` / NSIS-Fehler | Build unter `System32` | nach `%USERPROFILE%\Inbox` verschieben, dort erneut `.\install.cmd` |
 | `node` / `npm` nicht erkannt | Node fehlt oder PATH | Schritt 1 — Node LTS, PowerShell neu öffnen |
+| Build hängt >20 Min. nach `preload.js` | oft `winCodeSign`-Download / Defender | **Strg+C**, Windows-Defender-Ausschluss für den Projektordner, dann erneut `.\install.cmd` |
 
 ## Nutzung
 

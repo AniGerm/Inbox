@@ -18,9 +18,10 @@
     "build": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.json --noEmit && vite build",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win",
+    "dist:win": "npm run build && electron-builder --win --x64",
     "dist:linux": "npm run build && electron-builder --linux",
-    "capture:screens": "npm run build && electron scripts/capture-screens.mjs"
+    "capture:screens": "npm run build && electron scripts/capture-screens.mjs",
+    "dist:win:portable": "npm run build && electron-builder --win portable --x64"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
@@ -64,11 +65,11 @@
     ],
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        "nsis"
       ],
       "icon": "resources/icon.ico",
-      "artifactName": "Fax-Inbox-Setup-${version}.${ext}"
+      "artifactName": "Fax-Inbox-Setup-${version}.${ext}",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,

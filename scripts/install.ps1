@@ -107,8 +107,13 @@ npm install
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Ok "Abhängigkeiten installiert"
 
-Write-Info "Baue Windows-Installer (NSIS + portable)..."
-npm run dist:win
+# Skip Windows code-sign tool download (often hangs forever behind Defender).
+$env:CSC_IDENTITY_AUTO_DISCOVERY = "false"
+$env:ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES = "true"
+
+Write-Info "Baue Windows-Installer (NSIS, x64) — kann beim ersten Mal 5-15 Min. dauern..."
+Write-Info "Hinweis: Bei >20 Min. ohne Ausgabe: Strg+C, Defender-Ausschluss fuer den Ordner, erneut .\install.cmd"
+npm run dist:win -- --publish never
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Ok "Build fertig -> release\"
 
