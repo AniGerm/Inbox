@@ -55,7 +55,8 @@ function Ensure-Node {
     return
   }
 
-  Write-Info "Node.js fehlt — installiere OpenJS.NodeJS.LTS per winget..."
+  Write-Warn "Node.js fehlt. Schritt 1: bitte zuerst Node.js LTS von https://nodejs.org/ installieren (enthält npm), PowerShell neu öffnen, dann dieses Skript erneut starten."
+  Write-Info "Alternativ versuche ich winget (OpenJS.NodeJS.LTS)..."
   $winget = Get-Command winget -ErrorAction SilentlyContinue
   if (-not $winget) {
     Write-Err "winget nicht gefunden. Bitte Node LTS manuell von https://nodejs.org/ installieren und Skript erneut starten."

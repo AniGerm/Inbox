@@ -38,9 +38,20 @@ fax-inbox
 
 ### Windows
 
-**Git fehlt?** Zuerst [Git for Windows](https://git-scm.com/download/win) installieren, danach PowerShell **neu öffnen**.
+**Schritt 1 — Node.js + npm (Pflicht):**  
+[Node.js LTS](https://nodejs.org/) installieren (enthält npm). Danach PowerShell **neu öffnen** und prüfen:
 
-In **PowerShell** oder **cmd**:
+```powershell
+node -v
+npm -v
+```
+
+Beide Befehle müssen eine Version zeigen (Node ≥ 20).
+
+**Schritt 2 — Git (empfohlen):**  
+Falls `git` fehlt: [Git for Windows](https://git-scm.com/download/win) installieren, PowerShell neu öffnen.
+
+**Schritt 3 — App bauen & installieren** in PowerShell oder cmd:
 
 ```powershell
 git clone https://github.com/AniGerm/Inbox.git
@@ -52,9 +63,9 @@ cd Inbox
 
 Nicht unter `C:\Windows\System32` arbeiten — z. B. `C:\Users\<Name>\Inbox` verwenden.
 
-Das Skript:
+Das Skript (braucht Node/npm bereits):
 
-1. installiert Node.js LTS falls fehlend (`winget`)
+1. prüft Node.js (≥ 20); falls fehlend: Hinweis bzw. Fallback über `winget`
 2. baut **NSIS-Setup** + portable EXE
 3. startet die **Setup-.exe** → Startmenü- und Desktop-Verknüpfung
 
