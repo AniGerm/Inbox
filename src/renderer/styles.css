@@ -1,22 +1,22 @@
 :root {
-  --bg: #f4f2ee;
-  --bg-elevated: #faf9f7;
+  --bg: #f3f5f8;
+  --bg-elevated: #f7f8fa;
   --surface: #ffffff;
-  --text: #1c1b19;
-  --text-muted: #6b6860;
-  --text-faint: #9a968c;
-  --accent: #0f6e6a;
-  --accent-soft: #e4f2f1;
+  --text: #152033;
+  --text-muted: #5a6578;
+  --text-faint: #8b95a8;
+  --accent: #1a3a6b;
+  --accent-soft: #e6ecf5;
   --danger: #a83a2e;
   --danger-soft: #f8ebe8;
-  --border: #e4e0d8;
-  --border-strong: #d0cbc0;
-  --unread: #0f6e6a;
-  --focus: #0f6e6a;
-  --shadow-soft: 0 1px 0 rgba(28, 27, 25, 0.04);
+  --border: #dde3ec;
+  --border-strong: #c5cedc;
+  --unread: #1a3a6b;
+  --focus: #1a3a6b;
+  --shadow-soft: 0 1px 0 rgba(21, 32, 51, 0.04);
   --radius: 8px;
-  --font: 'DM Sans', ui-sans-serif, sans-serif;
-  --font-display: 'Instrument Serif', Georgia, serif;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --list-width: 300px;
 }
 
@@ -39,8 +39,8 @@ body {
   line-height: 1.45;
   color: var(--text);
   background:
-    radial-gradient(1200px 600px at 10% -10%, #e8f0ef 0%, transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, #f0ebe3 0%, transparent 50%),
+    radial-gradient(1200px 600px at 8% -12%, #e4ebf5 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #eef1f6 0%, transparent 50%),
     var(--bg);
   -webkit-font-smoothing: antialiased;
   user-select: none;
@@ -107,11 +107,12 @@ button {
 
 .brand {
   font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  line-height: 1;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
   margin: 0;
+  color: var(--text);
 }
 
 .unread-pill {
@@ -201,26 +202,27 @@ button {
 }
 
 .list-group + .list-group {
-  margin-top: 8px;
+  margin-top: 0;
 }
 
-.list-group-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 4px 12px 2px;
-  padding: 8px 6px 8px 6px;
+.list-group-banner {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 18px;
+  margin: 0;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border-strong);
+  color: #12305c;
+  background: #cfd9ea;
+  border-top: 1px solid #9eb0cc;
+  border-bottom: 1px solid #9eb0cc;
 }
 
-/* Label only — full-width rule under the row is the clear teiler */
-.list-group-header span {
-  flex: 0 0 auto;
+.list-group:first-child .list-group-banner {
+  border-top: none;
 }
 
 .list-item {
@@ -447,10 +449,11 @@ button {
 .empty h2,
 .setup h1 {
   font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 32px;
+  font-weight: 600;
+  font-size: 28px;
   margin: 0;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  color: var(--text);
 }
 
 .empty p,
@@ -532,9 +535,11 @@ button {
 
 .settings-panel h2 {
   font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: 400;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   margin: 0 0 16px;
+  color: var(--text);
 }
 
 .field {

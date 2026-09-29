@@ -65,7 +65,7 @@ function createWindow(): BrowserWindow {
     minWidth: 800,
     minHeight: 520,
     title: 'Fax Inbox',
-    backgroundColor: '#f4f2ee',
+    backgroundColor: '#f3f5f8',
     show: false,
     webPreferences: {
       preload: preloadPath(),

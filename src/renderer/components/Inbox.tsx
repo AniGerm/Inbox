@@ -308,8 +308,8 @@ export default function Inbox({
             ) : (
               groups.map((group) => (
                 <section key={group.key} className="list-group" aria-label={group.label}>
-                  <div className="list-group-header" role="presentation">
-                    <span>{group.label}</span>
+                  <div className="list-group-banner" role="presentation">
+                    {group.label}
                   </div>
                   {group.items.map((item) => {
                     const unread = item.seenAt === null && !item.archived
