@@ -4,11 +4,12 @@ Desktop-Inbox für eingehende Fax-PDFs (z. B. Ricoh IM350F).
 
 **Plattformen:** Windows und Ubuntu · **Stack:** Electron + Vite + React + TypeScript · **Format:** nur PDF
 
-## Fire-and-forget Installation (empfohlen)
+## Installation
 
-Ein Befehl: baut die App und richtet sie **richtig** ein.  
-Node.js wird **nur zum einmaligen Bauen** gebraucht und bei Bedarf automatisch installiert.  
-Die fertige App enthält Electron bereits — **kein Node zur Laufzeit**.
+Ein Install-Skript baut die App und richtet sie ein.  
+**Node.js wird nur zum einmaligen Bauen** gebraucht. Die fertige App enthält Electron bereits — **kein Node zur Laufzeit**.
+
+---
 
 ### Ubuntu
 
@@ -24,11 +25,11 @@ Das Skript:
 1. installiert Node.js 22 falls fehlend (NodeSource, benötigt `sudo`)
 2. installiert Electron-Systempakete falls nötig
 3. baut **AppImage** + **`.deb`**
-4. installiert das **`.deb` systemweit** → **„Fax Inbox“ erscheint im Anwendungsmenü** (Büro/Office)
+4. installiert das **`.deb` systemweit** → **„Fax Inbox“** im Anwendungsmenü (Büro/Office)
 5. kopiert das **AppImage** nach `~/Applications/`
 6. startet die App
 
-Danach im Menü nach **Fax Inbox** suchen — oder:
+Danach im Menü **Fax Inbox** suchen — oder:
 
 ```bash
 fax-inbox
@@ -36,48 +37,81 @@ fax-inbox
 ~/Applications/Fax-Inbox-*.AppImage
 ```
 
+---
+
 ### Windows
 
-**Schritt 1 — Node.js + npm (Pflicht):**  
-[Node.js LTS](https://nodejs.org/) installieren (enthält npm). Danach PowerShell **neu öffnen** und prüfen:
+**Wichtig:** Das Projekt **nicht** unter `C:\Windows\System32` ablegen.  
+Dort schlägt der Installer fehl (`StdUtils.nsh` / NSIS wegen WOW64).  
+Richtig z. B.: `C:\Users\<DeinName>\Inbox`
+
+#### Schritt 1 — Node.js + npm (Pflicht)
+
+1. [Node.js LTS](https://nodejs.org/) herunterladen und installieren (enthält **npm**).
+2. PowerShell **schließen und neu öffnen**.
+3. Prüfen:
 
 ```powershell
 node -v
 npm -v
 ```
 
-Beide Befehle müssen eine Version zeigen (Node ≥ 20).
+Beide Befehle müssen eine Version zeigen (**Node ≥ 20**).
 
-**Schritt 2 — Git (empfohlen):**  
-Falls `git` fehlt: [Git for Windows](https://git-scm.com/download/win) installieren, PowerShell neu öffnen.
+#### Schritt 2 — Projekt holen
 
-**Schritt 3 — App bauen & installieren** in PowerShell oder cmd:
+**Variante A — mit Git** (empfohlen):  
+Falls `git` fehlt: zuerst [Git for Windows](https://git-scm.com/download/win) installieren, PowerShell neu öffnen.
 
 ```powershell
+cd $env:USERPROFILE
 git clone https://github.com/AniGerm/Inbox.git
 cd Inbox
+```
+
+**Variante B — ohne Git (ZIP):**
+
+1. ZIP laden: https://github.com/AniGerm/Inbox/archive/refs/heads/main.zip
+2. Entpacken nach z. B. `C:\Users\<DeinName>\Inbox`
+3. In diesen Ordner wechseln:
+
+```powershell
+cd $env:USERPROFILE\Inbox
+# bzw. der entpackte Ordnername, z. B. Inbox-main
+```
+
+#### Schritt 3 — Bauen & installieren
+
+Im Projektordner (nicht System32):
+
+```powershell
 .\install.cmd
 ```
 
-(`install.cmd` umgeht die PowerShell-ExecutionPolicy. Alternativ: `Set-ExecutionPolicy -Scope Process Bypass`, dann `.\install.ps1`.)
+`install.cmd` umgeht die PowerShell-ExecutionPolicy.  
+Alternativ:
 
-Nicht unter `C:\Windows\System32` arbeiten — z. B. `C:\Users\<Name>\Inbox` verwenden.
-Unter System32 schlägt der Windows-Installer fehl (`StdUtils.nsh` / NSIS wegen WOW64-Umleitung).
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\install.ps1
+```
 
-Das Skript (braucht Node/npm bereits):
+Das Skript:
 
-1. prüft Node.js (≥ 20); falls fehlend: Hinweis bzw. Fallback über `winget`
-2. baut **NSIS-Setup** + portable EXE
-3. startet die **Setup-.exe** → Startmenü- und Desktop-Verknüpfung
+1. prüft Node.js / npm (Fallback: `winget`, falls Node fehlt)
+2. baut **NSIS-Setup** + portable EXE nach `release\`
+3. startet die **Setup-.exe** → Einträge in **Startmenü** und optional **Desktop**
 
-**Ohne Git:** ZIP von https://github.com/AniGerm/Inbox/archive/refs/heads/main.zip laden → entpacken → in dem Ordner `.\install.cmd` ausführen.
+Danach **Fax Inbox** im Startmenü öffnen.
+
+---
 
 ## Was du bekommst
 
 | OS | Artefakte | Integration |
 | --- | --- | --- |
 | Ubuntu | `.deb` + `.AppImage` in `release/` | `.deb` → App-Menü; AppImage → `~/Applications` |
-| Windows | NSIS Setup + portable `.exe` | Startmenü + Desktop (NSIS) |
+| Windows | NSIS Setup + portable `.exe` in `release\` | Startmenü + Desktop (NSIS) |
 
 ## Nur entwickeln (ohne Installation)
 
@@ -114,7 +148,7 @@ ELECTRON_DISABLE_SANDBOX=1 ~/Applications/Fax-Inbox-*.AppImage --no-sandbox
 tail -n 80 ~/.local/share/fax-inbox/launch.log
 ```
 
-3. Neu installieren (holt fehlende Libs inkl. FUSE für AppImage und startet mit sichtbarem Log):
+3. Neu installieren:
 
 ```bash
 cd ~/Inbox   # bzw. dein Clone-Pfad
@@ -123,12 +157,23 @@ cd ~/Inbox   # bzw. dein Clone-Pfad
 
 Häufige Ursachen: fehlendes `libfuse2` (AppImage), Chromium-Sandbox, oder ein unsichtbarer Hintergrundprozess — `pkill -f fax-inbox` und danach erneut starten.
 
+## Windows: Installer / Build schlägt fehl
+
+| Symptom | Ursache | Lösung |
+| --- | --- | --- |
+| `git` nicht erkannt | Git fehlt | [Git for Windows](https://git-scm.com/download/win) oder ZIP-Variante |
+| ExecutionPolicy / Skripte deaktiviert | PowerShell-Policy | `.\install.cmd` verwenden |
+| `MissingEndCurlyBrace` / kaputte Zeichen | veraltetes Skript | `git pull` bzw. frisches ZIP von **main** |
+| `StdUtils.nsh` / NSIS-Fehler | Build unter `System32` | nach `%USERPROFILE%\Inbox` verschieben, dort erneut `.\install.cmd` |
+| `node` / `npm` nicht erkannt | Node fehlt oder PATH | Schritt 1 — Node LTS, PowerShell neu öffnen |
+
 ## Nutzung
 
 1. Faxordner festlegen (Setup oder Zahnrad).
 2. PDFs erscheinen im Posteingang (Heute / Gestern / Vorgestern / Später).
 3. Systembenachrichtigung bei neuem Fax → Klick öffnet die App beim Fax.
 4. Vorschau: Zoom, Anpassen, Drehen · Archivieren · Umbenennen · Drucken · Löschen.
+5. Einstellungen → **Autostart**: startet die App nach dem Anmelden (Windows und Ubuntu).
 
 ## Nicht im MVP
 
