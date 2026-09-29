@@ -13,7 +13,7 @@ Die fertige App enthält Electron bereits — **kein Node zur Laufzeit**.
 ### Ubuntu
 
 ```bash
-git clone -b cursor/fax-inbox-mvp-df4f https://github.com/AniGerm/Inbox.git
+git clone https://github.com/AniGerm/Inbox.git
 cd Inbox
 chmod +x install.sh scripts/install.sh
 ./install.sh
@@ -41,7 +41,7 @@ fax-inbox
 In **PowerShell**:
 
 ```powershell
-git clone -b cursor/fax-inbox-mvp-df4f https://github.com/AniGerm/Inbox.git
+git clone https://github.com/AniGerm/Inbox.git
 cd Inbox
 .\install.ps1
 ```
@@ -52,7 +52,7 @@ Das Skript:
 2. baut **NSIS-Setup** + portable EXE
 3. startet die **Setup-.exe** → Startmenü- und Desktop-Verknüpfung
 
-Ohne Git: auf GitHub → Code → Download ZIP → entpacken → gleiches `install`-Skript.
+Ohne Git: auf GitHub → Code → Download ZIP (Branch **main**) → entpacken → gleiches `install`-Skript.
 
 ## Was du bekommst
 
@@ -70,7 +70,6 @@ Ohne Git: auf GitHub → Code → Download ZIP → entpacken → gleiches `insta
 
 ## Hinweis
 
-- Branch bis zum Merge: `cursor/fax-inbox-mvp-df4f` (danach reicht `main`).
 - Cross-Build (Windows-Installer unter Linux) ist nicht vorgesehen — jeweils auf dem Ziel-OS ausführen.
 
 ## Nutzung
