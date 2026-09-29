@@ -50,6 +50,8 @@ cd Inbox
 
 (`install.cmd` umgeht die PowerShell-ExecutionPolicy. Alternativ: `Set-ExecutionPolicy -Scope Process Bypass`, dann `.\install.ps1`.)
 
+Nicht unter `C:\Windows\System32` arbeiten — z. B. `C:\Users\<Name>\Inbox` verwenden.
+
 Das Skript:
 
 1. installiert Node.js LTS falls fehlend (`winget`)

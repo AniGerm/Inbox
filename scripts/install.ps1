@@ -1,4 +1,4 @@
-# Fax Inbox — Fire-and-forget Installation (Windows)
+﻿﻿# Fax Inbox — Fire-and-forget Installation (Windows)
 # Installiert bei Bedarf Node.js (winget), baut NSIS-Installer + portable EXE
 # und startet die Setup-.exe (Startmenü + Desktop-Verknüpfung).
 # Die fertige App braucht zur Laufzeit KEIN Node.
@@ -11,10 +11,10 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 
-function Write-Ok($msg)   { Write-Host "✓ $msg" -ForegroundColor Green }
+function Write-Ok($msg)   { Write-Host "[OK] $msg" -ForegroundColor Green }
 function Write-Warn($msg) { Write-Host "! $msg" -ForegroundColor Yellow }
-function Write-Err($msg)  { Write-Host "✗ $msg" -ForegroundColor Red }
-function Write-Info($msg) { Write-Host "→ $msg" -ForegroundColor Cyan }
+function Write-Err($msg)  { Write-Host "[X] $msg" -ForegroundColor Red }
+function Write-Info($msg) { Write-Host "-> $msg" -ForegroundColor Cyan }
 
 if ($Help) {
   Write-Host @"
@@ -55,7 +55,7 @@ function Ensure-Node {
     return
   }
 
-  Write-Info "Node.js fehlt — installiere OpenJS.NodeJS.LTS per winget…"
+  Write-Info "Node.js fehlt — installiere OpenJS.NodeJS.LTS per winget..."
   $winget = Get-Command winget -ErrorAction SilentlyContinue
   if (-not $winget) {
     Write-Err "winget nicht gefunden. Bitte Node LTS manuell von https://nodejs.org/ installieren und Skript erneut starten."
@@ -92,15 +92,15 @@ if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
 }
 Write-Ok "npm $(npm -v)"
 
-Write-Info "npm install…"
+Write-Info "npm install..."
 npm install
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Ok "Abhängigkeiten installiert"
 
-Write-Info "Baue Windows-Installer (NSIS + portable)…"
+Write-Info "Baue Windows-Installer (NSIS + portable)..."
 npm run dist:win
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-Write-Ok "Build fertig → release\"
+Write-Ok "Build fertig -> release\"
 
 $setup = Get-ChildItem -Path "release" -Filter "*Setup*.exe" -ErrorAction SilentlyContinue |
   Sort-Object LastWriteTime -Descending |
@@ -134,7 +134,7 @@ Write-Host "Hinweis: Die installierte App enthält Electron bereits — Node wir
 Write-Host ""
 
 if (-not $NoLaunch) {
-  Write-Info "Starte Installer…"
+  Write-Info "Starte Installer..."
   Start-Process -FilePath $setup.FullName -Wait
   Write-Ok "Installer beendet. Fax Inbox findest du im Startmenü."
 } else {
