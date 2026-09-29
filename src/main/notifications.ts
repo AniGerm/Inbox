@@ -3,27 +3,50 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { deflateSync } from 'node:zlib'
 
+export type OpenFaxHandler = (filePath: string) => void
+
+/**
+ * System notification for a new fax (Windows toast + Ubuntu/libnotify).
+ * Body click and the "App öffnen" action (where supported) both open the app
+ * and jump to the fax.
+ */
 export function showNewFaxNotification(
   fileName: string,
-  onClick: () => void,
+  filePath: string,
+  onOpen: OpenFaxHandler,
 ): void {
   if (!Notification.isSupported()) return
 
-  const notification = new Notification({
+  const open = () => onOpen(filePath)
+  const icon = loadTrayIconFromFile(1)
+
+  const options: Electron.NotificationConstructorOptions = {
     title: 'Neues Fax',
     body: fileName,
+    icon,
     silent: false,
-  })
+    urgency: 'normal',
+    timeoutType: 'default',
+  }
 
-  notification.on('click', onClick)
+  // Action button: fully supported on Windows; on some Linux DEs also shown.
+  // Clicking the toast body works on Windows and Ubuntu.
+  if (process.platform === 'win32' || process.platform === 'linux') {
+    options.actions = [{ type: 'button', text: 'App öffnen' }]
+  }
+  if (process.platform === 'win32') {
+    options.closeButtonText = 'Schließen'
+  }
+
+  const notification = new Notification(options)
+  notification.on('click', open)
+  notification.on('action', (_event, _index) => open())
   notification.show()
 }
 
 export function getTrayIcon(unreadCount: number): Electron.NativeImage {
   const size = 16
-  // Simple generated tray icon: dark rounded square with optional badge hint via title
   const canvas = Buffer.from(
-    // 16x16 PNG — solid dark teal square (minimal brand mark)
     createSimplePng(size, unreadCount > 0 ? [30, 90, 110] : [60, 70, 80]),
   )
   return nativeImage.createFromBuffer(canvas)
@@ -57,7 +80,6 @@ function createSimplePng(size: number, rgb: [number, number, number]): Buffer {
     raw[row] = 0
     for (let x = 0; x < size; x++) {
       const i = row + 1 + x * 3
-      // Soft circle mark
       const cx = x - size / 2 + 0.5
       const cy = y - size / 2 + 0.5
       const inCircle = cx * cx + cy * cy <= (size / 2.4) * (size / 2.4)
@@ -116,6 +138,14 @@ function crc32(buf: Buffer): number {
 export function focusMainWindow(win: BrowserWindow | null): void {
   if (!win) return
   if (win.isMinimized()) win.restore()
+  if (!win.isVisible()) win.show()
   win.show()
   win.focus()
+  if (process.platform === 'win32') {
+    // Flash taskbar briefly so the user notices the jump
+    win.flashFrame(true)
+    setTimeout(() => {
+      if (!win.isDestroyed()) win.flashFrame(false)
+    }, 1200)
+  }
 }

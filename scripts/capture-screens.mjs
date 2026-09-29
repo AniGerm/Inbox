@@ -49,6 +49,7 @@ function seed() {
 
   writeMinimalPdf(path.join(faxDir, 'angebot-mueller.pdf'))
   writeMinimalPdf(path.join(faxDir, 'termin-bestaetigung.pdf'))
+  writeMinimalPdf(path.join(faxDir, 'rechnung-alt.pdf'))
 
   fs.writeFileSync(
     path.join(userData, 'settings.json'),
@@ -148,7 +149,15 @@ app.whenReady().then(async () => {
     {
       path: path.join(faxDir, 'termin-bestaetigung.pdf'),
       name: 'termin-bestaetigung.pdf',
-      addedAt: new Date(Date.now() - 3600_000).toISOString(),
+      addedAt: new Date(Date.now() - 86_400_000).toISOString(),
+      seenAt: new Date().toISOString(),
+      size: 500,
+      archived: false,
+    },
+    {
+      path: path.join(faxDir, 'rechnung-alt.pdf'),
+      name: 'rechnung-alt.pdf',
+      addedAt: new Date(Date.now() - 5 * 86_400_000).toISOString(),
       seenAt: new Date().toISOString(),
       size: 500,
       archived: false,

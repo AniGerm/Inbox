@@ -18,6 +18,11 @@ import {
 } from './notifications'
 import type { AppSettings, FaxItem } from '../shared/types'
 
+// Required on Windows so system toasts are associated with this app
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.faxinbox.app')
+}
+
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let watcher: FaxWatcher | null = null
@@ -26,6 +31,21 @@ let latestItems: FaxItem[] = []
 let unreadCount = 0
 
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL
+
+function openFaxInApp(filePath: string): void {
+  focusMainWindow(mainWindow)
+  const send = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    mainWindow.webContents.send('focus-item', filePath)
+  }
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (mainWindow.webContents.isLoadingMainFrame()) {
+    mainWindow.webContents.once('did-finish-load', () => setTimeout(send, 40))
+  } else {
+    // Short delay so a just-shown window paints before selection
+    setTimeout(send, 40)
+  }
+}
 
 function preloadPath(): string {
   const candidates = [
@@ -132,10 +152,7 @@ function broadcastState(items: FaxItem[], count: number, newlyAdded?: FaxItem): 
   if (newlyAdded) {
     const settings = loadSettings()
     if (settings.notificationsEnabled) {
-      showNewFaxNotification(newlyAdded.name, () => {
-        focusMainWindow(mainWindow)
-        mainWindow?.webContents.send('focus-item', newlyAdded.path)
-      })
+      showNewFaxNotification(newlyAdded.name, newlyAdded.path, openFaxInApp)
     }
   }
 }

@@ -4,6 +4,7 @@ import PdfPreview from './PdfPreview'
 import RenameDialog from './RenameDialog'
 
 type ViewMode = 'inbox' | 'archive'
+type DayBucket = 'heute' | 'gestern' | 'vorgestern' | 'spaeter'
 
 type Props = {
   items: FaxItem[]
@@ -16,8 +17,49 @@ type Props = {
   onConsumedFocusPath: () => void
 }
 
-function formatWhen(iso: string): string {
+const BUCKET_ORDER: DayBucket[] = ['heute', 'gestern', 'vorgestern', 'spaeter']
+const BUCKET_LABEL: Record<DayBucket, string> = {
+  heute: 'Heute',
+  gestern: 'Gestern',
+  vorgestern: 'Vorgestern',
+  spaeter: 'Später',
+}
+
+function startOfLocalDay(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+}
+
+function bucketFor(iso: string, now = new Date()): DayBucket {
+  const day = startOfLocalDay(new Date(iso))
+  const today = startOfLocalDay(now)
+  const diffDays = Math.round((today - day) / 86_400_000)
+  if (diffDays <= 0) return 'heute'
+  if (diffDays === 1) return 'gestern'
+  if (diffDays === 2) return 'vorgestern'
+  return 'spaeter'
+}
+
+function groupByDay(items: FaxItem[]): Array<{ key: DayBucket; label: string; items: FaxItem[] }> {
+  const buckets = new Map<DayBucket, FaxItem[]>()
+  for (const key of BUCKET_ORDER) buckets.set(key, [])
+  for (const item of items) {
+    buckets.get(bucketFor(item.addedAt))!.push(item)
+  }
+  return BUCKET_ORDER.map((key) => ({
+    key,
+    label: BUCKET_LABEL[key],
+    items: buckets.get(key)!,
+  })).filter((g) => g.items.length > 0)
+}
+
+function formatWhen(iso: string, bucket: DayBucket): string {
   const d = new Date(iso)
+  if (bucket === 'heute' || bucket === 'gestern' || bucket === 'vorgestern') {
+    return new Intl.DateTimeFormat('de-DE', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(d)
+  }
   return new Intl.DateTimeFormat('de-DE', {
     day: '2-digit',
     month: '2-digit',
@@ -48,6 +90,8 @@ export default function Inbox({
     [items, view],
   )
 
+  const groups = useMemo(() => groupByDay(visible), [visible])
+
   const selected = items.find((i) => i.path === selectedPath) ?? null
   const selectedVisible = selected && visible.some((i) => i.path === selected.path) ? selected : null
 
@@ -59,25 +103,6 @@ export default function Inbox({
     }
   }, [visible, selectedPath])
 
-  useEffect(() => {
-    if (focusPath) {
-      const target = items.find((i) => i.path === focusPath)
-      if (target) {
-        setView(target.archived ? 'archive' : 'inbox')
-        setSelectedPath(focusPath)
-      }
-      onConsumedFocusPath()
-    }
-  }, [focusPath, items, onConsumedFocusPath])
-
-  useEffect(() => {
-    if (focusNewestToken > 0) {
-      setView('inbox')
-      const newest = items.find((i) => !i.archived)
-      if (newest) setSelectedPath(newest.path)
-    }
-  }, [focusNewestToken, items])
-
   const selectItem = useCallback(
     async (item: FaxItem) => {
       setSelectedPath(item.path)
@@ -88,6 +113,29 @@ export default function Inbox({
     },
     [onItemsChange],
   )
+
+  useEffect(() => {
+    if (!focusPath) return
+    const target = items.find((i) => i.path === focusPath)
+    if (target) {
+      setView(target.archived ? 'archive' : 'inbox')
+      void selectItem(target)
+      // Scroll selected into view after paint
+      requestAnimationFrame(() => {
+        const el = listRef.current?.querySelector(`[data-path="${CSS.escape(focusPath)}"]`)
+        el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      })
+    }
+    onConsumedFocusPath()
+  }, [focusPath, items, onConsumedFocusPath, selectItem])
+
+  useEffect(() => {
+    if (focusNewestToken > 0) {
+      setView('inbox')
+      const newest = items.find((i) => !i.archived)
+      if (newest) void selectItem(newest)
+    }
+  }, [focusNewestToken, items, selectItem])
 
   const print = useCallback(async () => {
     if (!selectedVisible) return
@@ -120,7 +168,6 @@ export default function Inbox({
         ? await window.faxInbox.restoreFax(selectedVisible.path)
         : await window.faxInbox.archiveFax(selectedVisible.path)
       onItemsChange(result.items)
-      // Stay on current view; selection moves to next in list
       const nextVisible = result.items.filter((i) =>
         view === 'archive' ? i.archived : !i.archived,
       )
@@ -259,24 +306,32 @@ export default function Inbox({
                 {view === 'inbox' && <p className="path">Überwacht: {faxFolder}</p>}
               </div>
             ) : (
-              visible.map((item) => {
-                const unread = item.seenAt === null && !item.archived
-                const selectedCls = item.path === selectedPath ? 'is-selected' : ''
-                return (
-                  <button
-                    key={item.path}
-                    type="button"
-                    role="option"
-                    aria-selected={item.path === selectedPath}
-                    className={`list-item ${unread ? 'is-unread' : ''} ${selectedCls}`}
-                    onClick={() => void selectItem(item)}
-                  >
-                    <span className="dot" aria-hidden />
-                    <span className="item-name">{item.name}</span>
-                    <span className="item-meta">{formatWhen(item.addedAt)}</span>
-                  </button>
-                )
-              })
+              groups.map((group) => (
+                <section key={group.key} className="list-group" aria-label={group.label}>
+                  <div className="list-group-header" role="presentation">
+                    <span>{group.label}</span>
+                  </div>
+                  {group.items.map((item) => {
+                    const unread = item.seenAt === null && !item.archived
+                    const selectedCls = item.path === selectedPath ? 'is-selected' : ''
+                    return (
+                      <button
+                        key={item.path}
+                        type="button"
+                        role="option"
+                        data-path={item.path}
+                        aria-selected={item.path === selectedPath}
+                        className={`list-item ${unread ? 'is-unread' : ''} ${selectedCls}`}
+                        onClick={() => void selectItem(item)}
+                      >
+                        <span className="dot" aria-hidden />
+                        <span className="item-name">{item.name}</span>
+                        <span className="item-meta">{formatWhen(item.addedAt, group.key)}</span>
+                      </button>
+                    )
+                  })}
+                </section>
+              ))
             )}
           </div>
         </aside>

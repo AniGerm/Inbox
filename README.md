@@ -91,12 +91,13 @@ Artefakte: `release/`.
 ## Nutzung
 
 1. Faxordner festlegen (Setup oder Zahnrad → Einstellungen).
-2. Neue PDFs erscheinen im **Posteingang** (neueste zuerst), ungelesen mit Punkt.
+2. Neue PDFs erscheinen im **Posteingang**, gruppiert nach **Heute / Gestern / Vorgestern / Später**.
 3. Klick öffnet die Vorschau und markiert als gelesen.
-4. **Archivieren** → `Faxordner/Archiv/` · **Umbenennen** ändert den Dateinamen.
-5. Vorschau: Zoom (+/−), **Anpassen**, **Drehen**.
-6. **Drucken** / **Löschen** (Löschen mit Bestätigung).
-7. Tray zeigt Ungelesen-Anzahl.
+4. Bei neuer Datei: **Systembenachrichtigung** (Windows-Toast / Ubuntu-Notification). Klick oder **App öffnen** bringt dich direkt zum neuen Fax.
+5. **Archivieren** → `Faxordner/Archiv/` · **Umbenennen** ändert den Dateinamen.
+6. Vorschau: Zoom (+/−), **Anpassen**, **Drehen**.
+7. **Drucken** / **Löschen** (Löschen mit Bestätigung).
+8. Tray zeigt Ungelesen-Anzahl.
 
 ### Tastatur
 
