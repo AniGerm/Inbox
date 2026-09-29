@@ -203,15 +203,16 @@ fix_chrome_sandbox() {
     warn "chrome-sandbox nicht gefunden — Starte mit --no-sandbox"
   fi
 
-  # Ensure menu/CLI launches pass --no-sandbox (Chromium reads this before JS).
+  # Ensure menu launches pass --no-sandbox (Chromium reads this before JS).
+  # electron-builder forbids linux.desktop.Exec — patch after install instead.
   local desktop
   for desktop in /usr/share/applications/fax-inbox.desktop /usr/share/applications/*fax*inbox*.desktop; do
     [[ -f "$desktop" ]] || continue
-    if grep -q '^Exec=' "$desktop"; then
-      if ! grep -q -- '--no-sandbox' "$desktop"; then
-        run_root sed -i 's|^Exec=\([^ ]*\)|Exec=\1 --no-sandbox|' "$desktop" || true
-      fi
-      ok "Desktop-Eintrag: $(basename "$desktop")"
+    if grep -q '^Exec=' "$desktop" && ! grep -q -- '--no-sandbox' "$desktop"; then
+      run_root sed -i -E 's|^Exec=([^ ]+)( .*)?$|Exec=\1 --no-sandbox\2|' "$desktop" || true
+    fi
+    if [[ -f "$desktop" ]]; then
+      ok "Desktop-Eintrag: $(basename "$desktop") → $(grep '^Exec=' "$desktop" || true)"
     fi
   done
 }
