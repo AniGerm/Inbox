@@ -38,6 +38,8 @@ fax-inbox
 
 ### Windows
 
+**Git fehlt?** Zuerst [Git for Windows](https://git-scm.com/download/win) installieren, danach PowerShell **neu öffnen**.
+
 In **PowerShell**:
 
 ```powershell
@@ -52,7 +54,7 @@ Das Skript:
 2. baut **NSIS-Setup** + portable EXE
 3. startet die **Setup-.exe** → Startmenü- und Desktop-Verknüpfung
 
-Ohne Git: auf GitHub → Code → Download ZIP (Branch **main**) → entpacken → gleiches `install`-Skript.
+**Ohne Git:** ZIP von https://github.com/AniGerm/Inbox/archive/refs/heads/main.zip laden → entpacken → in dem Ordner `.\install.ps1` ausführen.
 
 ## Was du bekommst
 
