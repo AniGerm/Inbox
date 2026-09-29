@@ -138,10 +138,6 @@ export default function Inbox({
 
   const print = useCallback(async () => {
     if (!selectedVisible) return
-    if (!document.querySelector('.preview-pages canvas')) {
-      window.alert('Vorschau wird noch geladen — bitte kurz warten und erneut drucken.')
-      return
-    }
     try {
       await window.faxInbox.printPreview(selectedVisible.path)
     } catch (err) {

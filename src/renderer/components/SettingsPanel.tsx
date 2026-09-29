@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { AppSettings } from '../../shared/types'
+import type { AppSettings, PrintMethod } from '../../shared/types'
 
 type Props = {
   settings: AppSettings
@@ -13,6 +13,9 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
     settings.notificationsEnabled,
   )
   const [autostart, setAutostart] = useState(settings.autostart)
+  const [printMethod, setPrintMethod] = useState<PrintMethod>(
+    settings.printMethod ?? 'external',
+  )
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -35,6 +38,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
         faxFolder: faxFolder.trim() || null,
         notificationsEnabled,
         autostart,
+        printMethod,
       })
     } finally {
       setBusy(false)
@@ -65,6 +69,44 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
           </div>
           {/* Scan folder: reserved for a later release — not used in MVP. */}
           <p className="field-hint">Nur PDF-Dateien in diesem Ordner werden überwacht.</p>
+        </div>
+
+        <div className="field">
+          <span className="field-label" id="print-method-label">
+            Drucken
+          </span>
+          <div
+            className="radio-group"
+            role="radiogroup"
+            aria-labelledby="print-method-label"
+          >
+            <label className="radio-row">
+              <input
+                type="radio"
+                name="printMethod"
+                value="external"
+                checked={printMethod === 'external'}
+                onChange={() => setPrintMethod('external')}
+              />
+              <span>
+                PDF im Standardprogramm öffnen
+                <span className="radio-hint">empfohlen unter Windows</span>
+              </span>
+            </label>
+            <label className="radio-row">
+              <input
+                type="radio"
+                name="printMethod"
+                value="system"
+                checked={printMethod === 'system'}
+                onChange={() => setPrintMethod('system')}
+              />
+              <span>
+                Direkt in Fax Inbox drucken
+                <span className="radio-hint">Electron-Druckdialog</span>
+              </span>
+            </label>
+          </div>
         </div>
 
         <div className="toggle-row">

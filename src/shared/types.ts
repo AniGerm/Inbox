@@ -7,10 +7,14 @@ export interface FaxItem {
   archived: boolean
 }
 
+export type PrintMethod = 'external' | 'system'
+
 export interface AppSettings {
   faxFolder: string | null
   notificationsEnabled: boolean
   autostart: boolean
+  /** external = open PDF in OS default app; system = Electron print dialog */
+  printMethod: PrintMethod
   // Scan folder reserved for a later release — not used in MVP.
   // scanFolder: string | null
 }
@@ -28,6 +32,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   faxFolder: null,
   notificationsEnabled: true,
   autostart: false,
+  printMethod: 'external',
 }
 
 export const ARCHIVE_DIR_NAME = 'Archiv'

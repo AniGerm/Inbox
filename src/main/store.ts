@@ -26,7 +26,11 @@ function writeJson(file: string, data: unknown): void {
 }
 
 export function loadSettings(): AppSettings {
-  return readJson(userDataPath(SETTINGS_FILE), { ...DEFAULT_SETTINGS })
+  const settings = readJson(userDataPath(SETTINGS_FILE), { ...DEFAULT_SETTINGS })
+  if (settings.printMethod !== 'external' && settings.printMethod !== 'system') {
+    settings.printMethod = DEFAULT_SETTINGS.printMethod
+  }
+  return settings
 }
 
 export function saveSettings(settings: AppSettings): void {
