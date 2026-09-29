@@ -382,7 +382,7 @@ function registerIpc(): void {
     return watcher.rename(filePath, newName)
   })
 
-    ipcMain.handle('print-fax', async (_e, filePath: string) => {
+  ipcMain.handle('print-fax', async (_e, filePath: string) => {
     await printPdfFile(filePath, mainWindow)
     return true
   })
