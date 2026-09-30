@@ -143,6 +143,7 @@ if (-not $setup) {
 }
 
 Write-Ok "Installer: $($setup.FullName)"
+Write-Ok "App-Version laut package.json: $((Get-Content package.json | ConvertFrom-Json).version)"
 Write-Host ""
 Write-Host "Die Setup-.exe richtet Fax Inbox im Startmenü und optional als Desktop-Verknüpfung ein."
 Write-Host "Hinweis: Die installierte App enthält Electron bereits — Node wird nur zum Bauen gebraucht."

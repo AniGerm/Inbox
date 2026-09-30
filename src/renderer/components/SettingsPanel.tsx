@@ -28,35 +28,44 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
   const [paperSize, setPaperSize] = useState(settings.paperSize ?? 'A4')
   const [printers, setPrinters] = useState<PrinterInfo[]>([])
   const [printersLoading, setPrintersLoading] = useState(false)
-  const [platform, setPlatform] = useState<string>('')
+  const [platform, setPlatform] = useState<string>('win32')
+  const [appVersion, setAppVersion] = useState('')
   const [busy, setBusy] = useState(false)
 
   const refreshPrinters = useCallback(async () => {
+    if (typeof window.faxInbox.listPrinters !== 'function') {
+      setPrinters([])
+      return
+    }
     setPrintersLoading(true)
     try {
       const list = await window.faxInbox.listPrinters()
       setPrinters(list)
-      if (!printerName) {
+      setPrinterName((current) => {
+        if (current) return current
         const def = list.find((p) => p.isDefault)
-        if (def) setPrinterName(def.name)
-      }
+        return def?.name ?? ''
+      })
     } catch (err) {
       console.error(err)
       setPrinters([])
     } finally {
       setPrintersLoading(false)
     }
-  }, [printerName])
-
-  useEffect(() => {
-    void window.faxInbox.getPlatform().then(setPlatform)
   }, [])
 
   useEffect(() => {
-    if (printMethod === 'direct') {
+    void window.faxInbox.getPlatform().then(setPlatform)
+    if (typeof window.faxInbox.getAppVersion === 'function') {
+      void window.faxInbox.getAppVersion().then(setAppVersion)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (printMethod === 'direct' && platform === 'win32') {
       void refreshPrinters()
     }
-  }, [printMethod, refreshPrinters])
+  }, [printMethod, platform, refreshPrinters])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -75,7 +84,11 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
     setBusy(true)
     try {
       const method: PrintMethod =
-        platform === 'win32' ? printMethod : printMethod === 'direct' ? 'external' : printMethod
+        platform === 'win32'
+          ? printMethod
+          : printMethod === 'direct'
+            ? 'external'
+            : printMethod
       await onSave({
         faxFolder: faxFolder.trim() || null,
         notificationsEnabled,
@@ -104,6 +117,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <h2>Einstellungen</h2>
+        {appVersion ? <p className="settings-version">Version {appVersion}</p> : null}
 
         <div className="field">
           <label htmlFor="fax-folder">Faxordner</label>
@@ -120,10 +134,13 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
           <p className="field-hint">Nur PDF-Dateien in diesem Ordner werden überwacht.</p>
         </div>
 
-        <div className="field">
+        <div className="field print-settings">
           <span className="field-label" id="print-method-label">
             Drucken
           </span>
+          <p className="field-hint">
+            Wähle, wie die App beim Klick auf <strong>Drucken</strong> vorgeht.
+          </p>
           <div
             className="radio-group"
             role="radiogroup"
@@ -155,7 +172,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
                 Direkt auf festen Drucker drucken
                 <span className="radio-hint">
                   {isWindows
-                    ? 'ohne Dialog, mit den Optionen unten'
+                    ? 'ohne Dialog, mit den Optionen unten (Windows)'
                     : 'nur unter Windows verfügbar'}
                 </span>
               </span>

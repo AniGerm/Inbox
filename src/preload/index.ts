@@ -32,6 +32,7 @@ const api = {
   revealInFolder: (filePath: string): Promise<void> =>
     ipcRenderer.invoke('reveal-in-folder', filePath),
   getPlatform: (): Promise<string> => ipcRenderer.invoke('get-platform'),
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke('get-app-version'),
   onInboxUpdated: (cb: (snap: InboxSnapshot) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, snap: InboxSnapshot) => cb(snap)
     ipcRenderer.on('inbox-updated', handler)

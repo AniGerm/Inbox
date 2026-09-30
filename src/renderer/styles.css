@@ -536,7 +536,9 @@ button {
 }
 
 .settings-panel {
-  width: min(440px, calc(100% - 32px));
+  width: min(480px, calc(100% - 32px));
+  max-height: min(90vh, 720px);
+  overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -550,8 +552,21 @@ button {
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  margin: 0 0 16px;
+  margin: 0 0 4px;
   color: var(--text);
+}
+
+.settings-version {
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.print-settings {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent-soft) 35%, var(--surface));
 }
 
 .field {

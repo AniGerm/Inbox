@@ -401,6 +401,8 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('get-platform', () => process.platform)
+
+  ipcMain.handle('get-app-version', () => app.getVersion())
 }
 
 // Single-instance lock must run before ready; otherwise a second start can
