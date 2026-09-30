@@ -302,16 +302,23 @@ async function printFax(filePath?: string): Promise<void> {
   const settings = loadSettings()
   const method = settings.printMethod ?? 'external'
 
-  if (method === 'direct') {
-    if (process.platform !== 'win32') {
-      await printViaExternalViewer(resolved)
-      return
-    }
-    await printViaPdfToPrinter(resolved, settings)
-    return
-  }
+  watcher?.setPrintStatus(resolved, 'printing')
 
-  await printViaExternalViewer(resolved)
+  try {
+    if (method === 'direct') {
+      if (process.platform !== 'win32') {
+        await printViaExternalViewer(resolved)
+      } else {
+        await printViaPdfToPrinter(resolved, settings)
+      }
+    } else {
+      await printViaExternalViewer(resolved)
+    }
+    watcher?.setPrintStatus(resolved, 'printed')
+  } catch (err) {
+    watcher?.setPrintStatus(resolved, 'error')
+    throw err
+  }
 }
 
 function registerIpc(): void {

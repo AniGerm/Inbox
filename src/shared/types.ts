@@ -1,3 +1,5 @@
+export type PrintStatus = 'none' | 'printing' | 'printed' | 'error'
+
 export interface FaxItem {
   path: string
   name: string
@@ -5,6 +7,10 @@ export interface FaxItem {
   seenAt: string | null
   size: number
   archived: boolean
+  /** Last print attempt outcome; 'printed' means handed off to printer/viewer */
+  printStatus: PrintStatus
+  /** ISO timestamp of last successful handoff; null if never printed */
+  printedAt: string | null
 }
 
 export type PrintMethod = 'external' | 'direct'
@@ -38,6 +44,8 @@ export interface InboxStateFile {
     addedAt: string
     seenAt: string | null
     archived?: boolean
+    printStatus?: PrintStatus
+    printedAt?: string | null
   }>
 }
 
