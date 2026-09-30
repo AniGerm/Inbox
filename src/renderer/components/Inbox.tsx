@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { FaxItem } from '../../shared/types'
+import type { FaxItem, PrintStatus } from '../../shared/types'
 import PdfPreview from './PdfPreview'
 import RenameDialog from './RenameDialog'
 
@@ -67,6 +67,83 @@ function formatWhen(iso: string, bucket: DayBucket): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(d)
+}
+
+function formatPrintedAt(iso: string): string {
+  return new Intl.DateTimeFormat('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso))
+}
+
+function printStatusLabel(item: FaxItem): string {
+  const status: PrintStatus = item.printStatus ?? 'none'
+  switch (status) {
+    case 'printing':
+      return 'Wird gedruckt…'
+    case 'printed':
+      return item.printedAt
+        ? `Gedruckt ${formatPrintedAt(item.printedAt)}`
+        : 'Gedruckt'
+    case 'error':
+      return 'Druck fehlgeschlagen'
+    default:
+      return 'Noch nicht gedruckt'
+  }
+}
+
+function PrintStatusIcon({ status }: { status: PrintStatus }) {
+  if (status === 'printing') {
+    return (
+      <svg className="print-status-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" opacity="0.25" />
+        <path
+          d="M21 12a9 9 0 0 0-9-9"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      </svg>
+    )
+  }
+  if (status === 'printed') {
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M5 13.5 9.5 18 19 7"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
+  }
+  if (status === 'error') {
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M12 7.5v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="12" cy="16.5" r="1.1" fill="currentColor" />
+      </svg>
+    )
+  }
+  // none — printer with slash
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M7 9V5h10v4M7 15H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M7 14h10v5H7v-5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M4 20 20 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
 }
 
 export default function Inbox({
@@ -312,6 +389,8 @@ export default function Inbox({
                   {group.items.map((item) => {
                     const unread = item.seenAt === null && !item.archived
                     const selectedCls = item.path === selectedPath ? 'is-selected' : ''
+                    const printStatus: PrintStatus = item.printStatus ?? 'none'
+                    const printLabel = printStatusLabel(item)
                     return (
                       <button
                         key={item.path}
@@ -324,6 +403,13 @@ export default function Inbox({
                       >
                         <span className="dot" aria-hidden />
                         <span className="item-name">{item.name}</span>
+                        <span
+                          className={`print-status is-${printStatus}`}
+                          title={printLabel}
+                          aria-label={printLabel}
+                        >
+                          <PrintStatusIcon status={printStatus} />
+                        </span>
                         <span className="item-meta">{formatWhen(item.addedAt, group.key)}</span>
                       </button>
                     )
