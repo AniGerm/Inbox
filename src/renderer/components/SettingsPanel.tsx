@@ -90,7 +90,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
               />
               <span>
                 PDF im Standardprogramm öffnen
-                <span className="radio-hint">empfohlen unter Windows</span>
+                <span className="radio-hint">empfohlen — z. B. Adobe</span>
               </span>
             </label>
             <label className="radio-row">
@@ -102,8 +102,8 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
                 onChange={() => setPrintMethod('system')}
               />
               <span>
-                Direkt in Fax Inbox drucken
-                <span className="radio-hint">Electron-Druckdialog</span>
+                Direkt drucken (Systemdialog)
+                <span className="radio-hint">Windows-Druckdialog / unter Linux Electron</span>
               </span>
             </label>
           </div>
