@@ -233,32 +233,60 @@ async function printViaExternalViewer(filePath: string): Promise<void> {
   }
 }
 
-/**
- * Linux: print the visible preview via Electron.
- * Windows: Chromium print is broken here ("Invalid printer settings") — do not use.
- */
-async function printViaElectronDialog(): Promise<void> {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    throw new Error('Fenster nicht bereit')
-  }
-  focusMainWindow(mainWindow)
-  await new Promise((r) => setTimeout(r, 200))
+type ListedPrinter = { name: string; isDefault: boolean }
 
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error('Druckdialog-Timeout — bitte erneut versuchen'))
-    }, 120_000)
-    mainWindow!.webContents.print(
-      { silent: false, printBackground: true },
-      (success, failureReason) => {
-        clearTimeout(timer)
-        if (!success && failureReason !== 'cancelled') {
-          reject(new Error(failureReason || 'Druck fehlgeschlagen'))
-        } else {
-          resolve()
-        }
-      },
+async function listSystemPrinters(): Promise<ListedPrinter[]> {
+  if (process.platform !== 'win32') return []
+  try {
+    // Lazy require so Linux builds don't load the Windows-only package at startup.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ptp = require('pdf-to-printer') as typeof import('pdf-to-printer')
+    const [printers, defaultPrinter] = await Promise.all([
+      ptp.getPrinters(),
+      ptp.getDefaultPrinter(),
+    ])
+    const defaultName = defaultPrinter?.name ?? null
+    return printers.map((p) => ({
+      name: p.name,
+      isDefault: defaultName !== null && p.name === defaultName,
+    }))
+  } catch (err) {
+    console.error('Druckerliste fehlgeschlagen:', err)
+    return []
+  }
+}
+
+function duplexToSumatraSide(
+  duplex: AppSettings['duplex'],
+): 'simplex' | 'duplexlong' | 'duplexshort' {
+  if (duplex === 'long') return 'duplexlong'
+  if (duplex === 'short') return 'duplexshort'
+  return 'simplex'
+}
+
+async function printViaPdfToPrinter(filePath: string, settings: AppSettings): Promise<void> {
+  const name = settings.printerName.trim()
+  if (!name) {
+    throw new Error('Kein Drucker gewählt. Bitte in den Einstellungen einen Drucker festlegen.')
+  }
+
+  const printers = await listSystemPrinters()
+  const match = printers.find((p) => p.name === name)
+  if (!match) {
+    throw new Error(
+      `Drucker "${name}" nicht gefunden. Bitte in den Einstellungen neu wählen.`,
     )
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const ptp = require('pdf-to-printer') as typeof import('pdf-to-printer')
+  await ptp.print(filePath, {
+    printer: name,
+    side: duplexToSumatraSide(settings.duplex),
+    monochrome: !settings.color,
+    copies: settings.copies,
+    paperSize: settings.paperSize || 'A4',
+    silent: true,
   })
 }
 
@@ -266,18 +294,24 @@ async function printFax(filePath?: string): Promise<void> {
   if (!filePath) {
     throw new Error('Keine Datei ausgewählt')
   }
+  const resolved = path.resolve(filePath)
+  if (!fs.existsSync(resolved)) {
+    throw new Error('Datei nicht gefunden')
+  }
 
   const settings = loadSettings()
   const method = settings.printMethod ?? 'external'
 
-  // Windows: always open in the default PDF app. Electron print dialog is unreliable
-  // (Invalid printer settings / locked cursor) on this stack.
-  if (process.platform === 'win32' || method === 'external') {
-    await printViaExternalViewer(filePath)
+  if (method === 'direct') {
+    if (process.platform !== 'win32') {
+      await printViaExternalViewer(resolved)
+      return
+    }
+    await printViaPdfToPrinter(resolved, settings)
     return
   }
 
-  await printViaElectronDialog()
+  await printViaExternalViewer(resolved)
 }
 
 function registerIpc(): void {
@@ -353,6 +387,8 @@ function registerIpc(): void {
     await printFax(typeof filePath === 'string' ? filePath : undefined)
     return true
   })
+
+  ipcMain.handle('list-printers', async () => listSystemPrinters())
 
   ipcMain.handle('read-pdf', async (_e, filePath: string) => {
     if (!fs.existsSync(filePath)) throw new Error('Datei nicht gefunden')

@@ -1,7 +1,13 @@
 import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
-import { DEFAULT_SETTINGS, type AppSettings, type InboxStateFile } from '../shared/types'
+import {
+  DEFAULT_SETTINGS,
+  type AppSettings,
+  type DuplexMode,
+  type InboxStateFile,
+  type PrintMethod,
+} from '../shared/types'
 
 const SETTINGS_FILE = 'settings.json'
 const STATE_FILE = 'inbox-state.json'
@@ -25,16 +31,38 @@ function writeJson(file: string, data: unknown): void {
   fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8')
 }
 
+function normalizePrintMethod(value: unknown): PrintMethod {
+  if (value === 'direct') return 'direct'
+  // legacy 'system' (Electron dialog) → external
+  return 'external'
+}
+
+function normalizeDuplex(value: unknown): DuplexMode {
+  if (value === 'long' || value === 'short' || value === 'simplex') return value
+  return DEFAULT_SETTINGS.duplex
+}
+
+function normalizeCopies(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return DEFAULT_SETTINGS.copies
+  return Math.min(99, Math.max(1, Math.round(n)))
+}
+
 export function loadSettings(): AppSettings {
-  const settings = readJson(userDataPath(SETTINGS_FILE), { ...DEFAULT_SETTINGS })
-  if (settings.printMethod !== 'external' && settings.printMethod !== 'system') {
-    settings.printMethod = DEFAULT_SETTINGS.printMethod
+  const raw = readJson(userDataPath(SETTINGS_FILE), { ...DEFAULT_SETTINGS })
+  return {
+    ...DEFAULT_SETTINGS,
+    ...raw,
+    printMethod: normalizePrintMethod(raw.printMethod),
+    printerName: typeof raw.printerName === 'string' ? raw.printerName : '',
+    duplex: normalizeDuplex(raw.duplex),
+    color: typeof raw.color === 'boolean' ? raw.color : DEFAULT_SETTINGS.color,
+    copies: normalizeCopies(raw.copies),
+    paperSize:
+      typeof raw.paperSize === 'string' && raw.paperSize.trim()
+        ? raw.paperSize.trim()
+        : DEFAULT_SETTINGS.paperSize,
   }
-  // Electron print dialog is unreliable on Windows — keep external.
-  if (process.platform === 'win32') {
-    settings.printMethod = 'external'
-  }
-  return settings
 }
 
 export function saveSettings(settings: AppSettings): void {

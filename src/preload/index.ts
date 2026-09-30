@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppSettings, FaxItem } from '../shared/types'
+import type { AppSettings, FaxItem, PrinterInfo } from '../shared/types'
 
 export interface InboxSnapshot {
   items: FaxItem[]
@@ -27,6 +27,7 @@ const api = {
     ipcRenderer.invoke('rename-fax', filePath, newName),
   printPreview: (filePath?: string): Promise<boolean> =>
     ipcRenderer.invoke('print-preview', filePath),
+  listPrinters: (): Promise<PrinterInfo[]> => ipcRenderer.invoke('list-printers'),
   readPdf: (filePath: string): Promise<ArrayBuffer> => ipcRenderer.invoke('read-pdf', filePath),
   revealInFolder: (filePath: string): Promise<void> =>
     ipcRenderer.invoke('reveal-in-folder', filePath),

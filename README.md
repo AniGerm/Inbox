@@ -187,7 +187,7 @@ Häufige Ursachen: fehlendes `libfuse2` (AppImage), Chromium-Sandbox, oder ein u
 3. Systembenachrichtigung bei neuem Fax → Klick öffnet die App beim Fax.
 4. Vorschau: Zoom, Anpassen, Drehen · Archivieren · Umbenennen · Drucken · Löschen.
 5. Einstellungen → **Autostart**: startet die App nach dem Anmelden (Windows und Ubuntu).
-6. **Drucken**: Unter Windows öffnet die App die PDF immer im Standardprogramm (z. B. Adobe). Unter Linux optional Direkt-Druck in den Einstellungen.
+6. **Drucken**: Standard „PDF im Standardprogramm“. Unter Windows optional „Direkt auf festen Drucker“ (Drucker, Duplex, Farbe, Kopien in den Einstellungen — ohne Dialog).
 
 ## Nicht im MVP
 

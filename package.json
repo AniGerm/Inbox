@@ -1,6 +1,6 @@
 {
   "name": "fax-inbox",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "description": "Fax Inbox – Desktop-Inbox für eingehende Fax-PDFs",
   "main": "dist-electron/main.js",
   "homepage": "https://github.com/AniGerm/Inbox",
@@ -26,6 +26,7 @@
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
     "chokidar": "^4.0.3",
+    "pdf-to-printer": "^5.8.1",
     "pdfjs-dist": "^4.10.38",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -125,6 +126,9 @@
     },
     "appImage": {
       "artifactName": "Fax-Inbox-${version}.AppImage"
-    }
+    },
+    "asarUnpack": [
+      "node_modules/pdf-to-printer/**"
+    ]
   }
 }
