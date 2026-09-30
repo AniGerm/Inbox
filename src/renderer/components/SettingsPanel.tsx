@@ -16,7 +16,12 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
   const [printMethod, setPrintMethod] = useState<PrintMethod>(
     settings.printMethod ?? 'external',
   )
+  const [platform, setPlatform] = useState<string>('win32')
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    void window.faxInbox.getPlatform().then(setPlatform)
+  }, [])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -34,16 +39,21 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
   const save = async () => {
     setBusy(true)
     try {
+      // Windows: Electron print is unreliable — always persist external.
+      const method: PrintMethod =
+        platform === 'win32' ? 'external' : (printMethod ?? 'external')
       await onSave({
         faxFolder: faxFolder.trim() || null,
         notificationsEnabled,
         autostart,
-        printMethod,
+        printMethod: method,
       })
     } finally {
       setBusy(false)
     }
   }
+
+  const isWindows = platform === 'win32'
 
   return (
     <div className="settings-backdrop" onClick={onClose} role="presentation">
@@ -75,38 +85,45 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
           <span className="field-label" id="print-method-label">
             Drucken
           </span>
-          <div
-            className="radio-group"
-            role="radiogroup"
-            aria-labelledby="print-method-label"
-          >
-            <label className="radio-row">
-              <input
-                type="radio"
-                name="printMethod"
-                value="external"
-                checked={printMethod === 'external'}
-                onChange={() => setPrintMethod('external')}
-              />
-              <span>
-                PDF im Standardprogramm öffnen
-                <span className="radio-hint">empfohlen — z. B. Adobe</span>
-              </span>
-            </label>
-            <label className="radio-row">
-              <input
-                type="radio"
-                name="printMethod"
-                value="system"
-                checked={printMethod === 'system'}
-                onChange={() => setPrintMethod('system')}
-              />
-              <span>
-                Direkt in Fax Inbox drucken
-                <span className="radio-hint">Druckdialog aus der Vorschau (PDF muss geladen sein)</span>
-              </span>
-            </label>
-          </div>
+          {isWindows ? (
+            <p className="field-hint">
+              Unter Windows öffnet <strong>Drucken</strong> die PDF im Standardprogramm (z. B.
+              Adobe). Der eingebaute Electron-Druckdialog ist dort nicht zuverlässig.
+            </p>
+          ) : (
+            <div
+              className="radio-group"
+              role="radiogroup"
+              aria-labelledby="print-method-label"
+            >
+              <label className="radio-row">
+                <input
+                  type="radio"
+                  name="printMethod"
+                  value="external"
+                  checked={printMethod === 'external'}
+                  onChange={() => setPrintMethod('external')}
+                />
+                <span>
+                  PDF im Standardprogramm öffnen
+                  <span className="radio-hint">z. B. Document Viewer</span>
+                </span>
+              </label>
+              <label className="radio-row">
+                <input
+                  type="radio"
+                  name="printMethod"
+                  value="system"
+                  checked={printMethod === 'system'}
+                  onChange={() => setPrintMethod('system')}
+                />
+                <span>
+                  Direkt in Fax Inbox drucken
+                  <span className="radio-hint">Druckdialog aus der Vorschau</span>
+                </span>
+              </label>
+            </div>
+          )}
         </div>
 
         <div className="toggle-row">

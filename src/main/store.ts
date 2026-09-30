@@ -30,6 +30,10 @@ export function loadSettings(): AppSettings {
   if (settings.printMethod !== 'external' && settings.printMethod !== 'system') {
     settings.printMethod = DEFAULT_SETTINGS.printMethod
   }
+  // Electron print dialog is unreliable on Windows — keep external.
+  if (process.platform === 'win32') {
+    settings.printMethod = 'external'
+  }
   return settings
 }
 

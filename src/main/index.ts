@@ -233,18 +233,9 @@ async function printViaExternalViewer(filePath: string): Promise<void> {
   }
 }
 
-function tipSwitchExternal(reason: string): Error {
-  return new Error(
-    `${reason}
-
-Tipp: Unter Einstellungen → Drucken „PDF im Standardprogramm öffnen“ wählen.`,
-  )
-}
-
 /**
- * Print from the visible main window (preview canvases + @media print CSS).
- * Never use a hidden BrowserWindow: Windows then locks the parent and hides
- * the print dialog (not-allowed cursor / "Invalid printer settings").
+ * Linux: print the visible preview via Electron.
+ * Windows: Chromium print is broken here ("Invalid printer settings") — do not use.
  */
 async function printViaElectronDialog(): Promise<void> {
   if (!mainWindow || mainWindow.isDestroyed()) {
@@ -253,34 +244,35 @@ async function printViaElectronDialog(): Promise<void> {
   focusMainWindow(mainWindow)
   await new Promise((r) => setTimeout(r, 200))
 
-  const options: Electron.WebContentsPrintOptions = {
-    silent: false,
-    printBackground: true,
-  }
-
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error('Druckdialog-Timeout — bitte erneut versuchen'))
     }, 120_000)
-    mainWindow!.webContents.print(options, (success, failureReason) => {
-      clearTimeout(timer)
-      if (!success && failureReason !== 'cancelled') {
-        reject(tipSwitchExternal(failureReason || 'Druck fehlgeschlagen'))
-      } else {
-        resolve()
-      }
-    })
+    mainWindow!.webContents.print(
+      { silent: false, printBackground: true },
+      (success, failureReason) => {
+        clearTimeout(timer)
+        if (!success && failureReason !== 'cancelled') {
+          reject(new Error(failureReason || 'Druck fehlgeschlagen'))
+        } else {
+          resolve()
+        }
+      },
+    )
   })
 }
 
 async function printFax(filePath?: string): Promise<void> {
+  if (!filePath) {
+    throw new Error('Keine Datei ausgewählt')
+  }
+
   const settings = loadSettings()
   const method = settings.printMethod ?? 'external'
 
-  if (method === 'external') {
-    if (!filePath) {
-      throw new Error('Keine Datei ausgewählt')
-    }
+  // Windows: always open in the default PDF app. Electron print dialog is unreliable
+  // (Invalid printer settings / locked cursor) on this stack.
+  if (process.platform === 'win32' || method === 'external') {
     await printViaExternalViewer(filePath)
     return
   }

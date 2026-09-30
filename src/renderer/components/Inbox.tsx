@@ -139,22 +139,11 @@ export default function Inbox({
   const print = useCallback(async () => {
     if (!selectedVisible) return
     try {
-      const settings = await window.faxInbox.getSettings()
-      if ((settings.printMethod ?? 'external') === 'system') {
-        if (!document.querySelector('.preview-pages canvas')) {
-          window.alert(
-            'Vorschau wird noch geladen — bitte kurz warten und erneut drucken.',
-          )
-          return
-        }
-      }
       await window.faxInbox.printPreview(selectedVisible.path)
     } catch (err) {
       console.error(err)
       const msg = err instanceof Error ? err.message : 'Druck fehlgeschlagen'
-      window.alert(`Drucken fehlgeschlagen:
-
-${msg}`)
+      window.alert(`Drucken fehlgeschlagen:\n\n${msg}`)
     }
   }, [selectedVisible])
 
