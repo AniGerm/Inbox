@@ -9,8 +9,6 @@ import {
 } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
-import { spawn } from 'node:child_process'
-import { pathToFileURL } from 'node:url'
 import { FaxWatcher } from './watcher'
 import { loadSettings, saveSettings } from './store'
 import {
@@ -235,32 +233,6 @@ async function printViaExternalViewer(filePath: string): Promise<void> {
   }
 }
 
-function runCommand(cmd: string, args: string[]): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { windowsHide: true })
-    let stderr = ''
-    child.stderr?.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString()
-    })
-    child.on('error', reject)
-    child.on('close', (code) => {
-      if (code === 0) resolve()
-      else reject(new Error(stderr.trim() || `Befehl fehlgeschlagen (${code})`))
-    })
-  })
-}
-
-/** Windows system print dialog via shell Print verb (bypasses Electron print bugs). */
-async function printViaWindowsShell(filePath: string): Promise<void> {
-  const escaped = filePath.replace(/'/g, "''")
-  await runCommand('powershell.exe', [
-    '-NoProfile',
-    '-NonInteractive',
-    '-Command',
-    `Start-Process -LiteralPath '${escaped}' -Verb Print`,
-  ])
-}
-
 function tipSwitchExternal(reason: string): Error {
   return new Error(
     `${reason}
@@ -270,82 +242,35 @@ Tipp: Unter Einstellungen → Drucken „PDF im Standardprogramm öffnen“ wäh
 }
 
 /**
- * Electron/Chromium print. Do NOT force deviceName on Windows — that often
- * triggers "Invalid printer settings". Prefer printing a dedicated PDF window.
+ * Print from the visible main window (preview canvases + @media print CSS).
+ * Never use a hidden BrowserWindow: Windows then locks the parent and hides
+ * the print dialog (not-allowed cursor / "Invalid printer settings").
  */
-async function printViaElectronDialog(filePath?: string): Promise<void> {
+async function printViaElectronDialog(): Promise<void> {
   if (!mainWindow || mainWindow.isDestroyed()) {
     throw new Error('Fenster nicht bereit')
   }
   focusMainWindow(mainWindow)
+  await new Promise((r) => setTimeout(r, 200))
 
   const options: Electron.WebContentsPrintOptions = {
     silent: false,
     printBackground: true,
   }
 
-  // Only set deviceName on Linux; on Windows it frequently breaks the dialog.
-  if (process.platform !== 'win32') {
-    try {
-      const printers = await mainWindow.webContents.getPrintersAsync()
-      const preferred =
-        printers.find((p) => p.isDefault) ??
-        printers.find((p) => p.status === 0) ??
-        printers[0]
-      if (preferred?.name) {
-        options.deviceName = preferred.name
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('Druckdialog-Timeout — bitte erneut versuchen'))
+    }, 120_000)
+    mainWindow!.webContents.print(options, (success, failureReason) => {
+      clearTimeout(timer)
+      if (!success && failureReason !== 'cancelled') {
+        reject(tipSwitchExternal(failureReason || 'Druck fehlgeschlagen'))
+      } else {
+        resolve()
       }
-    } catch (err) {
-      console.warn('Druckerliste nicht lesbar:', err)
-    }
-  }
-
-  // Prefer a dedicated window loading the PDF file (more reliable than printing the React UI).
-  let target = mainWindow.webContents
-  let printWin: BrowserWindow | null = null
-
-  if (filePath && fs.existsSync(filePath)) {
-    printWin = new BrowserWindow({
-      show: false,
-      parent: mainWindow,
-      webPreferences: {
-        sandbox: false,
-        contextIsolation: true,
-      },
     })
-    const url = pathToFileURL(path.resolve(filePath)).href
-    try {
-      await printWin.loadURL(url)
-      await new Promise((r) => setTimeout(r, 800))
-      target = printWin.webContents
-    } catch (err) {
-      console.warn('PDF-Fenster laden fehlgeschlagen, nutze Vorschau:', err)
-      if (printWin && !printWin.isDestroyed()) printWin.destroy()
-      printWin = null
-      target = mainWindow.webContents
-      await new Promise((r) => setTimeout(r, 300))
-    }
-  } else {
-    await new Promise((r) => setTimeout(r, 300))
-  }
-
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        reject(new Error('Druckdialog-Timeout — bitte erneut versuchen'))
-      }, 120_000)
-      target.print(options, (success, failureReason) => {
-        clearTimeout(timer)
-        if (!success && failureReason !== 'cancelled') {
-          reject(tipSwitchExternal(failureReason || 'Druck fehlgeschlagen'))
-        } else {
-          resolve()
-        }
-      })
-    })
-  } finally {
-    if (printWin && !printWin.isDestroyed()) printWin.destroy()
-  }
+  })
 }
 
 async function printFax(filePath?: string): Promise<void> {
@@ -360,27 +285,7 @@ async function printFax(filePath?: string): Promise<void> {
     return
   }
 
-  // system mode
-  if (!filePath) {
-    throw new Error('Keine Datei ausgewählt')
-  }
-  const resolved = path.resolve(filePath)
-  if (!fs.existsSync(resolved)) {
-    throw new Error('Datei nicht gefunden')
-  }
-
-  if (process.platform === 'win32') {
-    try {
-      await printViaWindowsShell(resolved)
-      return
-    } catch (shellErr) {
-      console.warn('Windows Shell-Druck fehlgeschlagen, versuche Electron:', shellErr)
-      await printViaElectronDialog(resolved)
-      return
-    }
-  }
-
-  await printViaElectronDialog(resolved)
+  await printViaElectronDialog()
 }
 
 function registerIpc(): void {

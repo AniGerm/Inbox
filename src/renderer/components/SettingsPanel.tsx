@@ -102,8 +102,8 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
                 onChange={() => setPrintMethod('system')}
               />
               <span>
-                Direkt drucken (Systemdialog)
-                <span className="radio-hint">Windows-Druckdialog / unter Linux Electron</span>
+                Direkt in Fax Inbox drucken
+                <span className="radio-hint">Druckdialog aus der Vorschau (PDF muss geladen sein)</span>
               </span>
             </label>
           </div>
