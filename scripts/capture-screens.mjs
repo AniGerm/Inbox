@@ -75,12 +75,16 @@ function seed() {
             addedAt: now,
             seenAt: null,
             archived: false,
+            printStatus: 'none',
+            printedAt: null,
           },
           {
             path: path.join(faxDir, 'termin-bestaetigung.pdf'),
             addedAt: new Date(Date.now() - 3600_000).toISOString(),
             seenAt: new Date(Date.now() - 1800_000).toISOString(),
             archived: false,
+            printStatus: 'printed',
+            printedAt: new Date(Date.now() - 1800_000).toISOString(),
           },
         ],
       },
@@ -145,6 +149,8 @@ app.whenReady().then(async () => {
       seenAt: null,
       size: 500,
       archived: false,
+      printStatus: 'none',
+      printedAt: null,
     },
     {
       path: path.join(faxDir, 'termin-bestaetigung.pdf'),
@@ -153,6 +159,8 @@ app.whenReady().then(async () => {
       seenAt: new Date().toISOString(),
       size: 500,
       archived: false,
+      printStatus: 'printed',
+      printedAt: new Date(Date.now() - 86_000_000).toISOString(),
     },
     {
       path: path.join(faxDir, 'rechnung-alt.pdf'),
@@ -161,6 +169,8 @@ app.whenReady().then(async () => {
       seenAt: new Date().toISOString(),
       size: 500,
       archived: false,
+      printStatus: 'error',
+      printedAt: null,
     },
   ]
 
