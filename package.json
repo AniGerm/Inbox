@@ -1,6 +1,6 @@
 {
   "name": "fax-inbox",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Fax Inbox – Desktop-Inbox für eingehende Fax-PDFs",
   "main": "dist-electron/main.js",
   "homepage": "https://github.com/AniGerm/Inbox",

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { AppSettings, FaxItem, UpdateStatusEvent } from '../shared/types'
+import { normalizeFaxFolders } from '../shared/types'
 import Setup from './components/Setup'
 import Inbox from './components/Inbox'
 import SettingsPanel from './components/SettingsPanel'
@@ -88,7 +89,10 @@ export default function App() {
   }, [])
 
   const handleSetupComplete = async (faxFolder: string) => {
-    const next = await window.faxInbox.saveSettings({ faxFolder })
+    const next = await window.faxInbox.saveSettings({
+      faxFolder,
+      faxFolders: [faxFolder],
+    })
     setSettings(next)
     await refreshInbox()
   }
@@ -103,9 +107,15 @@ export default function App() {
     return <div className="loading">Laden…</div>
   }
 
-  if (!settings.faxFolder) {
+  const watchedFolders = normalizeFaxFolders(settings)
+  if (watchedFolders.length === 0) {
     return <Setup onComplete={handleSetupComplete} />
   }
+
+  const folderLabel =
+    watchedFolders.length === 1
+      ? watchedFolders[0]
+      : `${watchedFolders.length} Ordner`
 
   return (
     <>
@@ -151,7 +161,8 @@ export default function App() {
       <Inbox
         items={items}
         unreadCount={unreadCount}
-        faxFolder={settings.faxFolder}
+        faxFolder={folderLabel}
+        faxFolders={watchedFolders}
         focusPath={focusPath}
         focusNewestToken={focusNewestToken}
         onOpenSettings={() => setShowSettings(true)}

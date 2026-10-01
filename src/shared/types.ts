@@ -22,7 +22,10 @@ export interface PrinterInfo {
 }
 
 export interface AppSettings {
+  /** Primary / first watched folder (legacy + convenience) */
   faxFolder: string | null
+  /** All watched fax folders (PDFs only, each with own Archiv/) */
+  faxFolders: string[]
   notificationsEnabled: boolean
   autostart: boolean
   /** external = open PDF in OS default app; direct = silent print to fixed printer (Windows) */
@@ -62,6 +65,7 @@ export interface InboxStateFile {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   faxFolder: null,
+  faxFolders: [],
   notificationsEnabled: true,
   autostart: false,
   printMethod: 'external',
@@ -71,6 +75,30 @@ export const DEFAULT_SETTINGS: AppSettings = {
   copies: 1,
   paperSize: 'A4',
   autoCheckUpdates: true,
+}
+
+/** Unique non-empty folder list; prefer faxFolders, fall back to legacy faxFolder. */
+export function normalizeFaxFolders(
+  settings: Pick<AppSettings, 'faxFolder' | 'faxFolders'>,
+): string[] {
+  const fromList = Array.isArray(settings.faxFolders)
+    ? settings.faxFolders.map((s) => String(s).trim()).filter(Boolean)
+    : []
+  const raw =
+    fromList.length > 0
+      ? fromList
+      : settings.faxFolder?.trim()
+        ? [settings.faxFolder.trim()]
+        : []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const p of raw) {
+    const key = p.replace(/\\/g, '/').toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(p)
+  }
+  return out
 }
 
 export const ARCHIVE_DIR_NAME = 'Archiv'

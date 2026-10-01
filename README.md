@@ -171,12 +171,10 @@ git push origin v0.3.0
 # oder: git push --tags
 ```
 
-Die Action `.github/workflows/release.yml` baut parallel:
+Die Action `.github/workflows/release.yml` baut parallel Windows und Ubuntu, sammelt die Artefakte und veröffentlicht sie **gemeinsam** am Tag (vermeidet Race Conditions zwischen den Jobs):
 
 - **Windows:** NSIS-Setup (`Fax-Inbox-Setup-….exe`, `latest.yml`, `.blockmap`)
 - **Ubuntu:** `.deb` + `.AppImage` (`Fax-Inbox-….deb`, `Fax-Inbox-….AppImage`)
-
-und hängt alles an dasselbe GitHub Release.
 
 Alternativ lokal bauen und manuell hochladen:
 

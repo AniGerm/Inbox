@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import {
   DEFAULT_SETTINGS,
+  normalizeFaxFolders,
   type AppSettings,
   type DuplexMode,
   type InboxStateFile,
@@ -50,9 +51,15 @@ function normalizeCopies(value: unknown): number {
 
 export function loadSettings(): AppSettings {
   const raw = readJson(userDataPath(SETTINGS_FILE), { ...DEFAULT_SETTINGS })
+  const folders = normalizeFaxFolders({
+    faxFolder: typeof raw.faxFolder === 'string' ? raw.faxFolder : null,
+    faxFolders: Array.isArray(raw.faxFolders) ? raw.faxFolders : [],
+  })
   return {
     ...DEFAULT_SETTINGS,
     ...raw,
+    faxFolders: folders,
+    faxFolder: folders[0] ?? null,
     printMethod: normalizePrintMethod(raw.printMethod),
     printerName: typeof raw.printerName === 'string' ? raw.printerName : '',
     duplex: normalizeDuplex(raw.duplex),
@@ -70,7 +77,12 @@ export function loadSettings(): AppSettings {
 }
 
 export function saveSettings(settings: AppSettings): void {
-  writeJson(userDataPath(SETTINGS_FILE), settings)
+  const folders = normalizeFaxFolders(settings)
+  writeJson(userDataPath(SETTINGS_FILE), {
+    ...settings,
+    faxFolders: folders,
+    faxFolder: folders[0] ?? null,
+  })
 }
 
 export function loadInboxState(): InboxStateFile {
