@@ -34,9 +34,20 @@ export interface AppSettings {
   color: boolean
   copies: number
   paperSize: string
+  /** Periodically check GitHub Releases for updates (packaged builds only) */
+  autoCheckUpdates: boolean
   // Scan folder reserved for a later release — not used in MVP.
   // scanFolder: string | null
 }
+
+/** Events forwarded from electron-updater to the renderer */
+export type UpdateStatusEvent =
+  | { type: 'checking' }
+  | { type: 'update-available'; version: string }
+  | { type: 'update-not-available'; version?: string }
+  | { type: 'download-progress'; percent: number }
+  | { type: 'update-downloaded'; version: string }
+  | { type: 'error'; message: string }
 
 export interface InboxStateFile {
   items: Array<{
@@ -59,6 +70,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   color: false,
   copies: 1,
   paperSize: 'A4',
+  autoCheckUpdates: true,
 }
 
 export const ARCHIVE_DIR_NAME = 'Archiv'

@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { AppSettings, FaxItem } from '../shared/types'
+import type { AppSettings, FaxItem, UpdateStatusEvent } from '../shared/types'
 import Setup from './components/Setup'
 import Inbox from './components/Inbox'
 import SettingsPanel from './components/SettingsPanel'
+
+type UpdateBanner = {
+  version: string
+  phase: 'available' | 'downloading' | 'ready'
+  percent: number | null
+}
 
 export default function App() {
   const [ready, setReady] = useState(false)
@@ -12,6 +18,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [focusPath, setFocusPath] = useState<string | null>(null)
   const [focusNewestToken, setFocusNewestToken] = useState(0)
+  const [updateBanner, setUpdateBanner] = useState<UpdateBanner | null>(null)
 
   const refreshInbox = useCallback(async () => {
     const snap = await window.faxInbox.getInbox()
@@ -51,6 +58,35 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (typeof window.faxInbox.onUpdateStatus !== 'function') return
+    return window.faxInbox.onUpdateStatus((event: UpdateStatusEvent) => {
+      if (event.type === 'update-available') {
+        setUpdateBanner({
+          version: event.version,
+          phase: 'available',
+          percent: null,
+        })
+      } else if (event.type === 'download-progress') {
+        setUpdateBanner((prev) =>
+          prev
+            ? { ...prev, phase: 'downloading', percent: event.percent }
+            : {
+                version: '',
+                phase: 'downloading',
+                percent: event.percent,
+              },
+        )
+      } else if (event.type === 'update-downloaded') {
+        setUpdateBanner({
+          version: event.version,
+          phase: 'ready',
+          percent: 100,
+        })
+      }
+    })
+  }, [])
+
   const handleSetupComplete = async (faxFolder: string) => {
     const next = await window.faxInbox.saveSettings({ faxFolder })
     setSettings(next)
@@ -73,6 +109,45 @@ export default function App() {
 
   return (
     <>
+      {updateBanner ? (
+        <div className="update-banner" role="status">
+          <span className="update-banner-text">
+            {updateBanner.phase === 'available' &&
+              `Version ${updateBanner.version} verfügbar`}
+            {updateBanner.phase === 'downloading' &&
+              `Update wird heruntergeladen… ${updateBanner.percent ?? 0} %`}
+            {updateBanner.phase === 'ready' &&
+              `Version ${updateBanner.version} bereit — neu starten zum Installieren`}
+          </span>
+          <div className="update-banner-actions">
+            {updateBanner.phase === 'available' ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void window.faxInbox.downloadUpdate()}
+              >
+                Herunterladen
+              </button>
+            ) : null}
+            {updateBanner.phase === 'ready' ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void window.faxInbox.installUpdate()}
+              >
+                Jetzt neu starten und installieren
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setShowSettings(true)}
+            >
+              Einstellungen
+            </button>
+          </div>
+        </div>
+      ) : null}
       <Inbox
         items={items}
         unreadCount={unreadCount}

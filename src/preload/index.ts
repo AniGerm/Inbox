@@ -1,5 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppSettings, FaxItem, PrinterInfo } from '../shared/types'
+import type {
+  AppSettings,
+  FaxItem,
+  PrinterInfo,
+  UpdateStatusEvent,
+} from '../shared/types'
 
 export interface InboxSnapshot {
   items: FaxItem[]
@@ -33,6 +38,15 @@ const api = {
     ipcRenderer.invoke('reveal-in-folder', filePath),
   getPlatform: (): Promise<string> => ipcRenderer.invoke('get-platform'),
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('get-app-version'),
+  checkForUpdates: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('download-update'),
+  installUpdate: (): Promise<{ ok: boolean; reason?: string }> =>
+    ipcRenderer.invoke('install-update'),
+  onUpdateStatus: (cb: (event: UpdateStatusEvent) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, event: UpdateStatusEvent) => cb(event)
+    ipcRenderer.on('update-status', handler)
+    return () => ipcRenderer.removeListener('update-status', handler)
+  },
   onInboxUpdated: (cb: (snap: InboxSnapshot) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, snap: InboxSnapshot) => cb(snap)
     ipcRenderer.on('inbox-updated', handler)

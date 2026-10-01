@@ -4,6 +4,7 @@ import type {
   DuplexMode,
   PrintMethod,
   PrinterInfo,
+  UpdateStatusEvent,
 } from '../../shared/types'
 
 type Props = {
@@ -12,12 +13,86 @@ type Props = {
   onClose: () => void
 }
 
+type UpdateUiState = {
+  status: string
+  availableVersion: string | null
+  downloadedVersion: string | null
+  progress: number | null
+  checking: boolean
+  downloading: boolean
+}
+
+const INITIAL_UPDATE: UpdateUiState = {
+  status: '',
+  availableVersion: null,
+  downloadedVersion: null,
+  progress: null,
+  checking: false,
+  downloading: false,
+}
+
+function applyUpdateEvent(prev: UpdateUiState, event: UpdateStatusEvent): UpdateUiState {
+  switch (event.type) {
+    case 'checking':
+      return {
+        ...prev,
+        checking: true,
+        status: 'Suche nach Updates…',
+      }
+    case 'update-available':
+      return {
+        ...prev,
+        checking: false,
+        availableVersion: event.version,
+        downloadedVersion: null,
+        progress: null,
+        status: `Version ${event.version} verfügbar`,
+      }
+    case 'update-not-available':
+      return {
+        ...prev,
+        checking: false,
+        availableVersion: null,
+        status: 'Du hast die neueste Version.',
+      }
+    case 'download-progress':
+      return {
+        ...prev,
+        downloading: true,
+        progress: event.percent,
+        status: `Download… ${event.percent} %`,
+      }
+    case 'update-downloaded':
+      return {
+        ...prev,
+        checking: false,
+        downloading: false,
+        progress: 100,
+        availableVersion: event.version,
+        downloadedVersion: event.version,
+        status: `Version ${event.version} bereit zur Installation`,
+      }
+    case 'error':
+      return {
+        ...prev,
+        checking: false,
+        downloading: false,
+        status: event.message,
+      }
+    default:
+      return prev
+  }
+}
+
 export default function SettingsPanel({ settings, onSave, onClose }: Props) {
   const [faxFolder, setFaxFolder] = useState(settings.faxFolder ?? '')
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     settings.notificationsEnabled,
   )
   const [autostart, setAutostart] = useState(settings.autostart)
+  const [autoCheckUpdates, setAutoCheckUpdates] = useState(
+    settings.autoCheckUpdates !== false,
+  )
   const [printMethod, setPrintMethod] = useState<PrintMethod>(
     settings.printMethod === 'direct' ? 'direct' : 'external',
   )
@@ -31,6 +106,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
   const [platform, setPlatform] = useState<string>('win32')
   const [appVersion, setAppVersion] = useState('')
   const [busy, setBusy] = useState(false)
+  const [updateUi, setUpdateUi] = useState<UpdateUiState>(INITIAL_UPDATE)
 
   const refreshPrinters = useCallback(async () => {
     if (typeof window.faxInbox.listPrinters !== 'function') {
@@ -42,7 +118,14 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
       const list = await window.faxInbox.listPrinters()
       setPrinters(list)
       setPrinterName((current) => {
-        if (current) return current
+        const saved = current.trim()
+        if (saved) {
+          // Prefer exact match; fall back to case-insensitive so the label shows
+          const exact = list.find((p) => p.name === saved)
+          if (exact) return exact.name
+          const loose = list.find((p) => p.name.toLowerCase() === saved.toLowerCase())
+          return loose?.name ?? saved
+        }
         const def = list.find((p) => p.isDefault)
         return def?.name ?? ''
       })
@@ -66,6 +149,13 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
       void refreshPrinters()
     }
   }, [printMethod, platform, refreshPrinters])
+
+  useEffect(() => {
+    if (typeof window.faxInbox.onUpdateStatus !== 'function') return
+    return window.faxInbox.onUpdateStatus((event) => {
+      setUpdateUi((prev) => applyUpdateEvent(prev, event))
+    })
+  }, [])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -93,6 +183,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
         faxFolder: faxFolder.trim() || null,
         notificationsEnabled,
         autostart,
+        autoCheckUpdates,
         printMethod: method,
         printerName: printerName.trim(),
         duplex,
@@ -103,6 +194,32 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
     } finally {
       setBusy(false)
     }
+  }
+
+  const checkUpdates = async () => {
+    if (typeof window.faxInbox.checkForUpdates !== 'function') return
+    setUpdateUi((prev) => ({
+      ...prev,
+      checking: true,
+      status: 'Suche nach Updates…',
+    }))
+    await window.faxInbox.checkForUpdates()
+  }
+
+  const downloadUpdate = async () => {
+    if (typeof window.faxInbox.downloadUpdate !== 'function') return
+    setUpdateUi((prev) => ({
+      ...prev,
+      downloading: true,
+      progress: 0,
+      status: 'Download startet…',
+    }))
+    await window.faxInbox.downloadUpdate()
+  }
+
+  const installUpdate = async () => {
+    if (typeof window.faxInbox.installUpdate !== 'function') return
+    await window.faxInbox.installUpdate()
   }
 
   const isWindows = platform === 'win32'
@@ -192,6 +309,10 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
                   disabled={printersLoading}
                 >
                   <option value="">— bitte wählen —</option>
+                  {/* Keep saved name visible while the list loads / if missing from OS list */}
+                  {printerName && !printers.some((p) => p.name === printerName) ? (
+                    <option value={printerName}>{printerName}</option>
+                  ) : null}
                   {printers.map((p) => (
                     <option key={p.name} value={p.name}>
                       {p.name}
@@ -290,6 +411,67 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
             onClick={() => setAutostart((v) => !v)}
             aria-label="Autostart"
           />
+        </div>
+
+        <div className="field update-settings">
+          <span className="field-label">Updates</span>
+          <p className="field-hint">
+            Aktuelle Version: <strong>{appVersion || '…'}</strong>
+            {isWindows
+              ? ' — Auto-Update über GitHub Releases (Windows-Installer).'
+              : ' — Auto-Update ist für den Windows-Installer vorgesehen.'}
+          </p>
+          <div className="toggle-row" style={{ borderTop: 'none', paddingTop: 0 }}>
+            <span>Automatisch nach Updates suchen</span>
+            <button
+              type="button"
+              className={`toggle ${autoCheckUpdates ? 'is-on' : ''}`}
+              aria-pressed={autoCheckUpdates}
+              onClick={() => setAutoCheckUpdates((v) => !v)}
+              aria-label="Automatisch nach Updates suchen"
+            />
+          </div>
+          <div className="update-actions">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={updateUi.checking || updateUi.downloading}
+              onClick={() => void checkUpdates()}
+            >
+              Nach Updates suchen
+            </button>
+            {updateUi.availableVersion && !updateUi.downloadedVersion ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={updateUi.downloading}
+                onClick={() => void downloadUpdate()}
+              >
+                Herunterladen
+              </button>
+            ) : null}
+            {updateUi.downloadedVersion ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void installUpdate()}
+              >
+                Jetzt neu starten und installieren
+              </button>
+            ) : null}
+          </div>
+          {updateUi.progress !== null && updateUi.downloading ? (
+            <div
+              className="update-progress"
+              role="progressbar"
+              aria-valuenow={updateUi.progress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div className="update-progress-bar" style={{ width: `${updateUi.progress}%` }} />
+            </div>
+          ) : null}
+          {updateUi.status ? <p className="update-status">{updateUi.status}</p> : null}
         </div>
 
         <div className="settings-footer">
