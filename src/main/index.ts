@@ -9,6 +9,8 @@ import {
 } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { FaxWatcher } from './watcher'
 import { loadSettings, saveSettings } from './store'
 import {
@@ -240,6 +242,8 @@ function applyAutostart(enabled: boolean): void {
 }
 
 
+const execFileAsync = promisify(execFile)
+
 /** Open PDF in the OS default application (Adobe etc.) — reliable print path. */
 async function printViaExternalViewer(filePath: string): Promise<void> {
   const resolved = path.resolve(filePath)
@@ -254,8 +258,7 @@ async function printViaExternalViewer(filePath: string): Promise<void> {
 
 type ListedPrinter = { name: string; isDefault: boolean }
 
-async function listSystemPrinters(): Promise<ListedPrinter[]> {
-  if (process.platform !== 'win32') return []
+async function listWindowsPrinters(): Promise<ListedPrinter[]> {
   try {
     // Lazy require so Linux builds don't load the Windows-only package at startup.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -270,9 +273,52 @@ async function listSystemPrinters(): Promise<ListedPrinter[]> {
       isDefault: defaultName !== null && p.name === defaultName,
     }))
   } catch (err) {
-    console.error('Druckerliste fehlgeschlagen:', err)
+    console.error('Windows-Druckerliste fehlgeschlagen:', err)
     return []
   }
+}
+
+/** CUPS queue list via lpstat (Ubuntu / Linux). */
+async function listCupsPrinters(): Promise<ListedPrinter[]> {
+  try {
+    const { stdout: accepting } = await execFileAsync('lpstat', ['-a'], {
+      encoding: 'utf8',
+      timeout: 15_000,
+    })
+    let defaultName: string | null = null
+    try {
+      const { stdout: defOut } = await execFileAsync('lpstat', ['-d'], {
+        encoding: 'utf8',
+        timeout: 10_000,
+      })
+      const m = defOut.match(/system default destination:\s*(.+)\s*$/im)
+      if (m?.[1]) defaultName = m[1].trim()
+    } catch {
+      /* no default configured */
+    }
+
+    const printers: ListedPrinter[] = []
+    for (const line of accepting.split(/\r?\n/)) {
+      const m = line.match(/^(.+?)\s+accepting\s+requests/i)
+      if (!m?.[1]) continue
+      const name = m[1].trim()
+      if (!name) continue
+      printers.push({
+        name,
+        isDefault: defaultName !== null && name === defaultName,
+      })
+    }
+    return printers
+  } catch (err) {
+    console.error('CUPS-Druckerliste fehlgeschlagen:', err)
+    return []
+  }
+}
+
+async function listSystemPrinters(): Promise<ListedPrinter[]> {
+  if (process.platform === 'win32') return listWindowsPrinters()
+  if (process.platform === 'linux') return listCupsPrinters()
+  return []
 }
 
 function duplexToSumatraSide(
@@ -281,6 +327,12 @@ function duplexToSumatraSide(
   if (duplex === 'long') return 'duplexlong'
   if (duplex === 'short') return 'duplexshort'
   return 'simplex'
+}
+
+function duplexToCupsSides(duplex: AppSettings['duplex']): string {
+  if (duplex === 'long') return 'two-sided-long-edge'
+  if (duplex === 'short') return 'two-sided-short-edge'
+  return 'one-sided'
 }
 
 async function printViaPdfToPrinter(filePath: string, settings: AppSettings): Promise<void> {
@@ -309,6 +361,50 @@ async function printViaPdfToPrinter(filePath: string, settings: AppSettings): Pr
   })
 }
 
+/** Silent print via CUPS `lp` (Ubuntu / Linux). */
+async function printViaCups(filePath: string, settings: AppSettings): Promise<void> {
+  const name = settings.printerName.trim()
+  if (!name) {
+    throw new Error('Kein Drucker gewählt. Bitte in den Einstellungen einen Drucker festlegen.')
+  }
+
+  const printers = await listSystemPrinters()
+  const match =
+    printers.find((p) => p.name === name) ??
+    printers.find((p) => p.name.toLowerCase() === name.toLowerCase())
+  if (!match) {
+    throw new Error(
+      `Drucker "${name}" nicht gefunden. Bitte CUPS/Drucker prüfen und in den Einstellungen neu wählen.`,
+    )
+  }
+
+  const copies = Math.min(99, Math.max(1, Math.round(Number(settings.copies)) || 1))
+  const paper = (settings.paperSize || 'A4').trim() || 'A4'
+  const args = [
+    '-d',
+    match.name,
+    '-n',
+    String(copies),
+    '-o',
+    `sides=${duplexToCupsSides(settings.duplex)}`,
+    '-o',
+    settings.color ? 'print-color-mode=color' : 'print-color-mode=monochrome',
+    '-o',
+    `media=${paper}`,
+    path.resolve(filePath),
+  ]
+
+  try {
+    await execFileAsync('lp', args, { encoding: 'utf8', timeout: 60_000 })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    throw new Error(
+      `CUPS-Druck fehlgeschlagen (${match.name}): ${msg}\n` +
+        'Tipp: Drucker in den Systemeinstellungen prüfen (`lpstat -a`).',
+    )
+  }
+}
+
 async function printFax(filePath?: string): Promise<void> {
   if (!filePath) {
     throw new Error('Keine Datei ausgewählt')
@@ -326,10 +422,12 @@ async function printFax(filePath?: string): Promise<void> {
 
   try {
     if (method === 'direct') {
-      if (process.platform !== 'win32') {
-        await printViaExternalViewer(resolved)
-      } else {
+      if (process.platform === 'win32') {
         await printViaPdfToPrinter(resolved, settings)
+      } else if (process.platform === 'linux') {
+        await printViaCups(resolved, settings)
+      } else {
+        await printViaExternalViewer(resolved)
       }
     } else {
       await printViaExternalViewer(resolved)

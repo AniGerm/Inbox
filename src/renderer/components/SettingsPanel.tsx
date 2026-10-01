@@ -165,7 +165,7 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
   }, [])
 
   useEffect(() => {
-    if (printMethod === 'direct' && platform === 'win32') {
+    if (printMethod === 'direct' && (platform === 'win32' || platform === 'linux')) {
       void refreshPrinters()
     }
   }, [printMethod, platform, refreshPrinters])
@@ -213,11 +213,13 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
     })
   }
 
+  const supportsDirectPrint = platform === 'win32' || platform === 'linux'
+
   const save = async () => {
     setBusy(true)
     try {
       const method: PrintMethod =
-        platform === 'win32'
+        supportsDirectPrint
           ? printMethod
           : printMethod === 'direct'
             ? 'external'
@@ -274,7 +276,7 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
   }
 
   const isWindows = platform === 'win32'
-  const showDirectOptions = printMethod === 'direct' && isWindows
+  const showDirectOptions = printMethod === 'direct' && supportsDirectPrint
 
   return (
     <div className="settings-backdrop" onClick={onClose} role="presentation">
@@ -409,21 +411,23 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
                 <span className="radio-hint">z. B. Adobe — Druckdialog dort</span>
               </span>
             </label>
-            <label className={`radio-row ${!isWindows ? 'is-disabled' : ''}`}>
+            <label className={`radio-row ${!supportsDirectPrint ? 'is-disabled' : ''}`}>
               <input
                 type="radio"
                 name="printMethod"
                 value="direct"
                 checked={printMethod === 'direct'}
-                disabled={!isWindows}
+                disabled={!supportsDirectPrint}
                 onChange={() => setPrintMethod('direct')}
               />
               <span>
                 Direkt auf festen Drucker drucken
                 <span className="radio-hint">
-                  {isWindows
-                    ? 'ohne Dialog, mit den Optionen unten (Windows)'
-                    : 'nur unter Windows verfügbar'}
+                  {supportsDirectPrint
+                    ? isWindows
+                      ? 'ohne Dialog, mit den Optionen unten (Windows)'
+                      : 'ohne Dialog über CUPS, mit den Optionen unten (Ubuntu)'
+                    : 'nur unter Windows und Ubuntu verfügbar'}
                 </span>
               </span>
             </label>
@@ -464,7 +468,9 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
               </div>
               {!printersLoading && printers.length === 0 && (
                 <p className="field-hint">
-                  Keine Drucker gefunden. Windows-Drucker prüfen und Liste aktualisieren.
+                  {isWindows
+                    ? 'Keine Drucker gefunden. Windows-Drucker prüfen und Liste aktualisieren.'
+                    : 'Keine Drucker gefunden. CUPS prüfen (`lpstat -a`) und Liste aktualisieren.'}
                 </p>
               )}
             </div>
