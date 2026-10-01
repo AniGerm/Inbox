@@ -20,6 +20,7 @@ export default function App() {
   const [focusPath, setFocusPath] = useState<string | null>(null)
   const [focusNewestToken, setFocusNewestToken] = useState(0)
   const [updateBanner, setUpdateBanner] = useState<UpdateBanner | null>(null)
+  const [restartingForUpdate, setRestartingForUpdate] = useState(false)
 
   const refreshInbox = useCallback(async () => {
     const snap = await window.faxInbox.getInbox()
@@ -84,8 +85,28 @@ export default function App() {
           phase: 'ready',
           percent: 100,
         })
+      } else if (event.type === 'installing') {
+        setRestartingForUpdate(true)
+        setShowSettings(false)
+      } else if (event.type === 'error') {
+        setRestartingForUpdate(false)
       }
     })
+  }, [])
+
+  const startInstallUpdate = useCallback(async () => {
+    if (typeof window.faxInbox.installUpdate !== 'function') return
+    setRestartingForUpdate(true)
+    setShowSettings(false)
+    // Let overlay paint before main shows the native dialog / quits
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    await new Promise<void>((resolve) => setTimeout(resolve, 80))
+    try {
+      await window.faxInbox.installUpdate()
+    } catch (err) {
+      console.error(err)
+      setRestartingForUpdate(false)
+    }
   }, [])
 
   const handleSetupComplete = async (faxFolder: string) => {
@@ -134,6 +155,7 @@ export default function App() {
               <button
                 type="button"
                 className="btn btn-primary"
+                disabled={restartingForUpdate}
                 onClick={() => void window.faxInbox.downloadUpdate()}
               >
                 Herunterladen
@@ -143,7 +165,8 @@ export default function App() {
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={() => void window.faxInbox.installUpdate()}
+                disabled={restartingForUpdate}
+                onClick={() => void startInstallUpdate()}
               >
                 Jetzt neu starten und installieren
               </button>
@@ -151,6 +174,7 @@ export default function App() {
             <button
               type="button"
               className="btn btn-ghost"
+              disabled={restartingForUpdate}
               onClick={() => setShowSettings(true)}
             >
               Einstellungen
@@ -172,13 +196,26 @@ export default function App() {
         }}
         onConsumedFocusPath={() => setFocusPath(null)}
       />
-      {showSettings && (
+      {showSettings && !restartingForUpdate && (
         <SettingsPanel
           settings={settings}
           onSave={handleSettingsSave}
           onClose={() => setShowSettings(false)}
+          onInstallUpdate={() => void startInstallUpdate()}
         />
       )}
+      {restartingForUpdate ? (
+        <div className="update-restart-overlay" role="alertdialog" aria-modal="true">
+          <div className="update-restart-card">
+            <h2>Update wird installiert</h2>
+            <p>
+              Fax Inbox wird jetzt beendet. Gleich öffnet sich der Installer — bitte kurz
+              warten. Die App startet danach automatisch neu.
+            </p>
+            <div className="update-restart-spinner" aria-hidden />
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }

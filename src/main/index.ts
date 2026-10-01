@@ -443,7 +443,11 @@ if (!gotSingleInstanceLock) {
   app.whenReady().then(() => {
     registerIpc()
     mainWindow = createWindow()
-    initUpdater(() => mainWindow)
+    initUpdater(() => mainWindow, {
+      prepareForQuit: () => {
+        isQuitting = true
+      },
+    })
 
     try {
       tray = new Tray(loadTrayIconFromFile(0))

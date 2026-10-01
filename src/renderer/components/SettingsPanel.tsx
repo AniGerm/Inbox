@@ -11,6 +11,7 @@ type Props = {
   settings: AppSettings
   onSave: (partial: Partial<AppSettings>) => Promise<void>
   onClose: () => void
+  onInstallUpdate?: () => void
 }
 
 type UpdateUiState = {
@@ -72,6 +73,13 @@ function applyUpdateEvent(prev: UpdateUiState, event: UpdateStatusEvent): Update
         downloadedVersion: event.version,
         status: `Version ${event.version} bereit zur Installation`,
       }
+    case 'installing':
+      return {
+        ...prev,
+        checking: false,
+        downloading: false,
+        status: 'App wird beendet — Installer startet…',
+      }
     case 'error':
       return {
         ...prev,
@@ -84,7 +92,7 @@ function applyUpdateEvent(prev: UpdateUiState, event: UpdateStatusEvent): Update
   }
 }
 
-export default function SettingsPanel({ settings, onSave, onClose }: Props) {
+export default function SettingsPanel({ settings, onSave, onClose, onInstallUpdate }: Props) {
   const initialFolders =
     Array.isArray(settings.faxFolders) && settings.faxFolders.length > 0
       ? settings.faxFolders
@@ -242,6 +250,10 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
   }
 
   const installUpdate = async () => {
+    if (onInstallUpdate) {
+      onInstallUpdate()
+      return
+    }
     if (typeof window.faxInbox.installUpdate !== 'function') return
     await window.faxInbox.installUpdate()
   }
