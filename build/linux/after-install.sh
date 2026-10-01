@@ -5,6 +5,36 @@
 # Never sed [^ ]+ against that — it breaks the .desktop file.
 set +e
 
+# ---------------------------------------------------------------------------
+# Stop any running Fax Inbox instance before the new binaries take effect.
+#
+# Why: Electron's single-instance lock (app.requestSingleInstanceLock) makes
+# a freshly installed binary exit immediately while an old process is still
+# running. The user then sees the OLD UI after an upgrade and thinks the
+# update failed. Kill the old process here so the next launch is the new one.
+# ---------------------------------------------------------------------------
+stop_running_fax_inbox() {
+  local pattern='Fax Inbox/fax-inbox'
+  if ! pgrep -f "$pattern" >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "Fax Inbox: laufende Instanz wird für das Update beendet…" >&2
+  pkill -f "$pattern" 2>/dev/null || true
+  local i
+  for i in 1 2 3 4 5; do
+    if ! pgrep -f "$pattern" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+  if pgrep -f "$pattern" >/dev/null 2>&1; then
+    echo "Fax Inbox: erzwinge Beenden (SIGKILL)…" >&2
+    pkill -9 -f "$pattern" 2>/dev/null || true
+    sleep 1
+  fi
+}
+stop_running_fax_inbox
+
 APP_DIR=""
 for d in "/opt/Fax Inbox" "/opt/fax-inbox" "/opt/Fax-Inbox"; do
   if [ -e "$d/chrome-sandbox" ] || [ -x "$d/fax-inbox" ]; then

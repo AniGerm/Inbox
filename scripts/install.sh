@@ -239,6 +239,19 @@ EOF
 }
 fix_chrome_sandbox
 
+# Stop any running instance so the newly installed binary wins on next launch
+# (Electron's single-instance lock would otherwise keep the old UI alive).
+if pgrep -f 'Fax Inbox/fax-inbox' >/dev/null 2>&1; then
+  info "Beende laufende Fax Inbox-Instanz…"
+  pkill -f 'Fax Inbox/fax-inbox' 2>/dev/null || true
+  for i in 1 2 3 4 5; do
+    pgrep -f 'Fax Inbox/fax-inbox' >/dev/null 2>&1 || break
+    sleep 1
+  done
+  pkill -9 -f 'Fax Inbox/fax-inbox' 2>/dev/null || true
+  ok "Alte Instanz beendet"
+fi
+
 # Refresh desktop database / icon cache (best effort)
 if command -v update-desktop-database >/dev/null 2>&1; then
   run_root update-desktop-database /usr/share/applications 2>/dev/null || true

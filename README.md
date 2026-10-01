@@ -198,6 +198,37 @@ Die installierte App prüft beim Start (nach ~10 s) und alle 4 Stunden auf U
 
 ## Ubuntu: App startet nicht / klicken tut nichts
 
+### Nach einem Update: Alte Version läuft noch
+
+Wenn nach `sudo apt install ./Fax-Inbox-*.deb` weiterhin die alte UI erscheint
+(fehlende Menüeinträge, alte Versionsnummer in den Einstellungen), läuft die
+vorherige Instanz noch im Hintergrund. Electron erlaubt nur eine Instanz pro
+User; die neu installierte Binary beendet sich in dem Fall sofort selbst.
+
+**Erkennen:**
+
+```bash
+pgrep -af 'Fax Inbox/fax-inbox'
+```
+
+Zeigt das Prozesse mit alter Startzeit (vor dem Update), ist die alte Instanz
+noch aktiv.
+
+**Beheben:**
+
+```bash
+pkill -f 'Fax Inbox/fax-inbox'
+sleep 2
+fax-inbox
+```
+
+Oder die App sauber über das Tray-Symbol → **Beenden** schließen und neu starten.
+
+Ab Version 0.3.9 beendet der `.deb`-Installer laufende Instanzen automatisch
+während des Upgrades — dann ist dieser manuelle Schritt nicht mehr nötig.
+
+### Sofort-Fix bei Sandbox- / Desktop-Problemen
+
 **Sofort-Fix** (häufigste Ursache — kaputte Desktop-`Exec` / Sandbox; App startet und bricht sofort ab):
 
 ```bash
