@@ -223,13 +223,18 @@ fix_chrome_sandbox() {
     fi
   done
   if [[ -n "$app_bin" ]]; then
-    run_root tee /usr/bin/fax-inbox >/dev/null <<EOF
+    if file "$app_bin" | grep -q 'ELF'; then
+      run_root tee /usr/bin/fax-inbox >/dev/null <<EOF
 #!/bin/bash
 export ELECTRON_DISABLE_SANDBOX=1
 exec "$app_bin" --no-sandbox "\$@"
 EOF
-    run_root chmod 755 /usr/bin/fax-inbox
-    ok "CLI-Wrapper: /usr/bin/fax-inbox → $app_bin --no-sandbox"
+      run_root chmod 755 /usr/bin/fax-inbox
+      ok "CLI-Wrapper: /usr/bin/fax-inbox → $app_bin --no-sandbox"
+    else
+      warn "$app_bin ist keine ELF-Binary ($(file -b "$app_bin")) — Wrapper wird nicht installiert."
+      warn "Bitte sauber neu bauen (npm run dist:linux) und .deb erneut installieren."
+    fi
   fi
 }
 fix_chrome_sandbox
