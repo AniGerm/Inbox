@@ -2,7 +2,7 @@ import chokidar, { type FSWatcher } from 'chokidar'
 import fs from 'node:fs'
 import path from 'node:path'
 import { loadInboxState, saveInboxState } from './store'
-import { ARCHIVE_DIR_NAME, type FaxItem, type PrintStatus } from '../shared/types'
+import { ARCHIVE_DIR_NAME, type ExportStatus, type FaxItem, type PrintStatus } from '../shared/types'
 
 type KnownItem = {
   path: string
@@ -11,6 +11,8 @@ type KnownItem = {
   archived?: boolean
   printStatus?: PrintStatus
   printedAt?: string | null
+  exportStatus?: ExportStatus
+  exportedAt?: string | null
 }
 
 function printFieldsFromKnown(existing?: KnownItem): Pick<FaxItem, 'printStatus' | 'printedAt'> {
@@ -21,6 +23,19 @@ function printFieldsFromKnown(existing?: KnownItem): Pick<FaxItem, 'printStatus'
   return {
     printStatus: printStatus === 'printing' ? 'none' : printStatus,
     printedAt,
+  }
+}
+
+function exportFieldsFromKnown(
+  existing?: KnownItem,
+): Pick<FaxItem, 'exportStatus' | 'exportedAt'> {
+  const exportedAt = existing?.exportedAt ?? null
+  const exportStatus =
+    existing?.exportStatus ?? (exportedAt ? 'exported' : 'none')
+  return {
+    exportStatus:
+      exportStatus === 'exporting' ? 'none' : exportStatus,
+    exportedAt,
   }
 }
 
@@ -272,6 +287,23 @@ export class FaxWatcher {
     return this.getItems()
   }
 
+  setExportStatus(
+    filePath: string,
+    status: ExportStatus,
+    exportedAt?: string | null,
+  ): FaxItem[] {
+    const item = this.items.get(this.key(filePath))
+    if (item) {
+      item.exportStatus = status
+      if (status === 'exported') {
+        item.exportedAt = exportedAt ?? new Date().toISOString()
+      }
+      this.persist()
+      this.emit()
+    }
+    return this.getItems()
+  }
+
   remove(filePath: string): FaxItem[] {
     const k = this.key(filePath)
     const item = this.items.get(k)
@@ -397,6 +429,7 @@ export class FaxWatcher {
         size: meta.size,
         archived,
         ...printFieldsFromKnown(existing),
+        ...exportFieldsFromKnown(existing),
       })
     }
   }
@@ -446,6 +479,8 @@ export class FaxWatcher {
           archived,
           printStatus: 'none',
           printedAt: null,
+          exportStatus: 'none',
+          exportedAt: null,
         }
         this.items.set(k, item)
         changed = true
@@ -488,6 +523,8 @@ export class FaxWatcher {
       archived: hit.archived,
       printStatus: 'none',
       printedAt: null,
+      exportStatus: 'none',
+      exportedAt: null,
     }
     this.items.set(k, item)
     this.persist()
@@ -505,13 +542,24 @@ export class FaxWatcher {
   private persist(): void {
     saveInboxState({
       items: this.getItems().map(
-        ({ path: p, addedAt, seenAt, archived, printStatus, printedAt }) => ({
+        ({
           path: p,
           addedAt,
           seenAt,
           archived,
           printStatus,
           printedAt,
+          exportStatus,
+          exportedAt,
+        }) => ({
+          path: p,
+          addedAt,
+          seenAt,
+          archived,
+          printStatus,
+          printedAt,
+          exportStatus,
+          exportedAt,
         }),
       ),
     })

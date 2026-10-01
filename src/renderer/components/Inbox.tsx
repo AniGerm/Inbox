@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { FaxItem, PrintStatus } from '../../shared/types'
+import type { ExportStatus, FaxItem, PrintStatus } from '../../shared/types'
 import PdfPreview from './PdfPreview'
 import RenameDialog from './RenameDialog'
 
@@ -132,6 +132,36 @@ function printStatusLabel(item: FaxItem): string {
   }
 }
 
+function exportStatusLabel(item: FaxItem): string {
+  const status: ExportStatus = item.exportStatus ?? 'none'
+  switch (status) {
+    case 'exporting':
+      return 'Wird kopiert…'
+    case 'exported':
+      return item.exportedAt
+        ? `Exportiert ${formatPrintedAt(item.exportedAt)}`
+        : 'Exportiert'
+    case 'error':
+      return 'Export fehlgeschlagen'
+    default:
+      return 'Noch nicht exportiert'
+  }
+}
+
+function formatReexportConfirm(exportedAt: string): string {
+  const d = new Date(exportedAt)
+  const date = new Intl.DateTimeFormat('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+  }).format(d)
+  const time = new Intl.DateTimeFormat('de-DE', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d)
+  return `Du hast dieses Dokument bereits am ${date} um ${time} Uhr exportiert.\n\nMöchtest du es erneut kopieren?`
+}
+
 function PrinterIcon({ slashed = false }: { slashed?: boolean }) {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -149,44 +179,78 @@ function PrinterIcon({ slashed = false }: { slashed?: boolean }) {
   )
 }
 
+/** Hard-disk / storage glyph — slashed = not exported yet */
+function StorageIcon({ slashed = false }: { slashed?: boolean }) {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect
+        x="4"
+        y="6"
+        width="16"
+        height="12"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <path d="M4 12h16" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="8" cy="15.5" r="1.1" fill="currentColor" />
+      {slashed ? (
+        <path d="M4 20 20 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      ) : null}
+    </svg>
+  )
+}
+
+function StatusSpinner() {
+  return (
+    <svg className="print-status-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" opacity="0.25" />
+      <path
+        d="M21 12a9 9 0 0 0-9-9"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+function StatusCheck() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M5 13.5 9.5 18 19 7"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function StatusError() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 7.5v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="12" cy="16.5" r="1.1" fill="currentColor" />
+    </svg>
+  )
+}
+
 function PrintStatusIcon({ status }: { status: PrintStatus }) {
-  if (status === 'printing') {
-    return (
-      <svg className="print-status-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" opacity="0.25" />
-        <path
-          d="M21 12a9 9 0 0 0-9-9"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-      </svg>
-    )
-  }
-  if (status === 'printed') {
-    return (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path
-          d="M5 13.5 9.5 18 19 7"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    )
-  }
-  if (status === 'error') {
-    return (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
-        <path d="M12 7.5v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="12" cy="16.5" r="1.1" fill="currentColor" />
-      </svg>
-    )
-  }
-  // none — printer with slash
+  if (status === 'printing') return <StatusSpinner />
+  if (status === 'printed') return <StatusCheck />
+  if (status === 'error') return <StatusError />
   return <PrinterIcon slashed />
+}
+
+function ExportStatusIcon({ status }: { status: ExportStatus }) {
+  if (status === 'exporting') return <StatusSpinner />
+  if (status === 'exported') return <StatusCheck />
+  if (status === 'error') return <StatusError />
+  return <StorageIcon slashed />
 }
 
 export default function Inbox({
@@ -287,10 +351,17 @@ export default function Inbox({
       if (go) onOpenSettings()
       return
     }
+    if (
+      selectedVisible.exportStatus === 'exported' &&
+      selectedVisible.exportedAt
+    ) {
+      const ok = window.confirm(formatReexportConfirm(selectedVisible.exportedAt))
+      if (!ok) return
+    }
     setExporting(true)
     try {
       const result = await window.faxInbox.exportFax(selectedVisible.path)
-      window.alert(`Kopiert nach:\n${result.dest}`)
+      onItemsChange(result.items)
     } catch (err) {
       console.error(err)
       const msg = err instanceof Error ? err.message : 'Kopieren fehlgeschlagen'
@@ -298,7 +369,7 @@ export default function Inbox({
     } finally {
       setExporting(false)
     }
-  }, [selectedVisible, exportFolder, onOpenSettings])
+  }, [selectedVisible, exportFolder, onOpenSettings, onItemsChange])
 
   const remove = useCallback(async () => {
     if (!selectedVisible) return
@@ -470,10 +541,16 @@ export default function Inbox({
                     const unread = item.seenAt === null && !item.archived
                     const selectedCls = item.path === selectedPath ? 'is-selected' : ''
                     const printStatus: PrintStatus = item.printStatus ?? 'none'
+                    const exportStatus: ExportStatus = item.exportStatus ?? 'none'
                     const printLabel = printStatusLabel(item)
+                    const exportLabel = exportStatusLabel(item)
                     const printedShort =
                       printStatus === 'printed' && item.printedAt
                         ? formatPrintedAtShort(item.printedAt)
+                        : null
+                    const exportedShort =
+                      exportStatus === 'exported' && item.exportedAt
+                        ? formatPrintedAtShort(item.exportedAt)
                         : null
                     return (
                       <button
@@ -487,20 +564,37 @@ export default function Inbox({
                       >
                         <span className="dot" aria-hidden />
                         <span className="item-name">{item.name}</span>
-                        <span
-                          className={`print-status is-${printStatus}`}
-                          title={printLabel}
-                          aria-label={printLabel}
-                        >
-                          <PrintStatusIcon status={printStatus} />
-                          {printedShort ? (
-                            <span className="print-status-meta">
-                              <span className="print-status-printer" aria-hidden>
-                                <PrinterIcon />
+                        <span className="file-status" aria-hidden={false}>
+                          <span
+                            className={`file-status-row is-${printStatus}`}
+                            title={printLabel}
+                            aria-label={printLabel}
+                          >
+                            <PrintStatusIcon status={printStatus} />
+                            {printedShort ? (
+                              <span className="file-status-meta">
+                                <span className="file-status-glyph" aria-hidden>
+                                  <PrinterIcon />
+                                </span>
+                                <span className="file-status-time">{printedShort}</span>
                               </span>
-                              <span className="print-status-time">{printedShort}</span>
-                            </span>
-                          ) : null}
+                            ) : null}
+                          </span>
+                          <span
+                            className={`file-status-row is-${exportStatus}`}
+                            title={exportLabel}
+                            aria-label={exportLabel}
+                          >
+                            <ExportStatusIcon status={exportStatus} />
+                            {exportedShort ? (
+                              <span className="file-status-meta">
+                                <span className="file-status-glyph" aria-hidden>
+                                  <StorageIcon />
+                                </span>
+                                <span className="file-status-time">{exportedShort}</span>
+                              </span>
+                            ) : null}
+                          </span>
                         </span>
                         <span className="item-meta" title={`Empfangen ${formatPrintedAt(item.addedAt)}`}>
                           {formatWhen(item.addedAt, group.key)}
@@ -541,7 +635,7 @@ export default function Inbox({
                 </button>
                 <button
                   type="button"
-                  className="btn btn-ghost"
+                  className="btn btn-primary"
                   disabled={exporting}
                   title={
                     exportFolder?.trim()

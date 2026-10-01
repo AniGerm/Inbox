@@ -1,4 +1,5 @@
 export type PrintStatus = 'none' | 'printing' | 'printed' | 'error'
+export type ExportStatus = 'none' | 'exporting' | 'exported' | 'error'
 
 export interface FaxItem {
   path: string
@@ -11,6 +12,10 @@ export interface FaxItem {
   printStatus: PrintStatus
   /** ISO timestamp of last successful handoff; null if never printed */
   printedAt: string | null
+  /** Last export/copy attempt outcome */
+  exportStatus: ExportStatus
+  /** ISO timestamp of last successful export copy; null if never exported */
+  exportedAt: string | null
 }
 
 export type PrintMethod = 'external' | 'direct'
@@ -65,6 +70,8 @@ export interface InboxStateFile {
     archived?: boolean
     printStatus?: PrintStatus
     printedAt?: string | null
+    exportStatus?: ExportStatus
+    exportedAt?: string | null
   }>
 }
 

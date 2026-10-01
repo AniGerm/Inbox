@@ -296,6 +296,57 @@ button {
   flex-shrink: 0;
 }
 
+.file-status {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: center;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  min-width: 16px;
+  flex-shrink: 0;
+}
+
+.file-status-row {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1px;
+  color: var(--text-faint);
+  line-height: 1;
+}
+
+.file-status-meta,
+.print-status-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 120px;
+}
+
+.file-status-glyph,
+.print-status-printer {
+  display: inline-flex;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.file-status-time,
+.print-status-time {
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
 .print-status-time {
   font-size: 10px;
   line-height: 1.2;
@@ -321,27 +372,37 @@ button {
   opacity: 0.85;
 }
 
-.print-status.is-printing {
+.print-status.is-printing,
+.file-status-row.is-printing,
+.file-status-row.is-exporting {
   color: var(--accent);
 }
 
-.print-status.is-printed {
+.print-status.is-printed,
+.file-status-row.is-printed,
+.file-status-row.is-exported {
   color: #1a7f4b;
 }
 
-.print-status.is-printed .print-status-time {
+.print-status.is-printed .print-status-time,
+.file-status-row.is-printed .file-status-time,
+.file-status-row.is-exported .file-status-time {
   color: color-mix(in srgb, #1a7f4b 55%, var(--text-faint));
 }
 
-.print-status.is-printed .print-status-printer {
+.print-status.is-printed .print-status-printer,
+.file-status-row.is-printed .file-status-glyph,
+.file-status-row.is-exported .file-status-glyph {
   color: color-mix(in srgb, #1a7f4b 70%, var(--text-faint));
 }
 
-.print-status.is-error {
+.print-status.is-error,
+.file-status-row.is-error {
   color: #c0392b;
 }
 
-.print-status.is-none {
+.print-status.is-none,
+.file-status-row.is-none {
   color: var(--text-faint);
   opacity: 0.7;
 }
