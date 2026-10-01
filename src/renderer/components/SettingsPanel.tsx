@@ -78,7 +78,7 @@ function applyUpdateEvent(prev: UpdateUiState, event: UpdateStatusEvent): Update
         ...prev,
         checking: false,
         downloading: false,
-        status: 'App wird beendet — Installer startet…',
+        status: 'App wird beendet — Installation startet…',
       }
     case 'error':
       return {
@@ -498,7 +498,9 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
             Aktuelle Version: <strong>{appVersion || '…'}</strong>
             {isWindows
               ? ' — Auto-Update über GitHub Releases (Windows-Installer).'
-              : ' — Auto-Update ist für den Windows-Installer vorgesehen.'}
+              : platform === 'linux'
+                ? ' — Update per Klick: .deb mit Passwort-Abfrage, AppImage mit Neustart.'
+                : ' — Updates über GitHub Releases.'}
           </p>
           <div className="toggle-row" style={{ borderTop: 'none', paddingTop: 0 }}>
             <span>Automatisch nach Updates suchen</span>
@@ -535,7 +537,7 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
                 className="btn btn-primary"
                 onClick={() => void installUpdate()}
               >
-                Jetzt neu starten und installieren
+                Jetzt installieren
               </button>
             ) : null}
           </div>

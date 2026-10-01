@@ -148,7 +148,7 @@ export default function App() {
             {updateBanner.phase === 'downloading' &&
               `Update wird heruntergeladen… ${updateBanner.percent ?? 0} %`}
             {updateBanner.phase === 'ready' &&
-              `Version ${updateBanner.version} bereit — neu starten zum Installieren`}
+              `Version ${updateBanner.version} bereit — per Klick installieren`}
           </span>
           <div className="update-banner-actions">
             {updateBanner.phase === 'available' ? (
@@ -168,7 +168,7 @@ export default function App() {
                 disabled={restartingForUpdate}
                 onClick={() => void startInstallUpdate()}
               >
-                Jetzt neu starten und installieren
+                Jetzt installieren
               </button>
             ) : null}
             <button
@@ -209,8 +209,8 @@ export default function App() {
           <div className="update-restart-card">
             <h2>Update wird installiert</h2>
             <p>
-              Fax Inbox wird jetzt beendet. Gleich öffnet sich der Installer — bitte kurz
-              warten. Die App startet danach automatisch neu.
+              Fax Inbox wird jetzt beendet. Unter Linux erscheint ggf. die Passwort-Abfrage
+              zur Installation — bitte bestätigen. Die App startet danach automatisch neu.
             </p>
             <div className="update-restart-spinner" aria-hidden />
           </div>
