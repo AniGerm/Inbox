@@ -24,14 +24,28 @@ if [ -n "$APP_DIR" ] && [ -f "$APP_DIR/chrome-sandbox" ]; then
   chmod 4755 "$APP_DIR/chrome-sandbox" || true
 fi
 
-# CLI + menu entry point: always go through a wrapper with --no-sandbox
-if [ -n "$APP_DIR" ] && [ -x "$APP_DIR/fax-inbox" ]; then
-  cat > /usr/bin/fax-inbox <<EOF
+# CLI + menu entry point: always go through a wrapper with --no-sandbox.
+#
+# IMPORTANT: $APP_DIR/fax-inbox MUST be the real Electron binary (ELF),
+# never a shell script. If it is a script, a previous broken build wrote
+# a self-recursive wrapper there — refuse to install and warn loudly.
+if [ -n "$APP_DIR" ] && [ -e "$APP_DIR/fax-inbox" ]; then
+  if file "$APP_DIR/fax-inbox" | grep -q 'ELF'; then
+    cat > /usr/bin/fax-inbox <<EOF
 #!/bin/bash
+if [ -n "\$FAX_INBOX_WRAPPER_ACTIVE" ]; then
+  echo "FATAL: recursive launch detected (broken /opt install)" >&2
+  exit 1
+fi
+export FAX_INBOX_WRAPPER_ACTIVE=1
 export ELECTRON_DISABLE_SANDBOX=1
 exec "$APP_DIR/fax-inbox" --no-sandbox "\$@"
 EOF
-  chmod 755 /usr/bin/fax-inbox || true
+    chmod 755 /usr/bin/fax-inbox || true
+  else
+    echo "WARN: $APP_DIR/fax-inbox is not an ELF binary (found: $(file -b "$APP_DIR/fax-inbox"))" >&2
+    echo "WARN: refusing to install recursive wrapper. Please reinstall the .deb from a clean build." >&2
+  fi
 fi
 
 # Rewrite desktop Exec to the wrapper (safe with spaces in install path)
