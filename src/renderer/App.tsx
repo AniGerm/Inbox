@@ -187,6 +187,8 @@ export default function App() {
         unreadCount={unreadCount}
         faxFolder={folderLabel}
         faxFolders={watchedFolders}
+        exportButtonLabel={settings.exportButtonLabel || 'In Ordner kopieren'}
+        exportFolder={settings.exportFolder}
         focusPath={focusPath}
         focusNewestToken={focusNewestToken}
         onOpenSettings={() => setShowSettings(true)}

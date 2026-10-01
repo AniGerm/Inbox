@@ -286,10 +286,11 @@ Häufige Ursachen: fehlendes `libfuse2` (AppImage), Chromium-Sandbox, oder ein u
 1. Faxordner festlegen (Setup oder Zahnrad).
 2. PDFs erscheinen im Posteingang (Heute / Gestern / Vorgestern / Später).
 3. Systembenachrichtigung bei neuem Fax → Klick öffnet die App beim Fax.
-4. Vorschau: Zoom, Anpassen, Drehen · Archivieren · Umbenennen · Drucken · Löschen.
+4. Vorschau: Zoom, Anpassen, Drehen · Archivieren · Umbenennen · Drucken · **Export/Kopieren** · Löschen.
 5. Einstellungen → **Autostart**: startet die App nach dem Anmelden (Windows und Ubuntu).
 6. **Drucken**: Standard „PDF im Standardprogramm“. Unter Windows optional „Direkt auf festen Drucker“ (Drucker, Duplex, Farbe, Kopien in den Einstellungen — ohne Dialog).
-7. **Updates** (Windows, Setup-Installation): Hinweisbanner bzw. Einstellungen → Updates; kein Neustart ohne Bestätigung.
+7. **Export / Kopieren**: Button neben Drucken; in den Einstellungen Zielordner und Button-Namen festlegen (z. B. „T2 med exportieren“).
+8. **Updates** (Windows/Ubuntu): Hinweisbanner bzw. Einstellungen → Updates; kein Neustart ohne Bestätigung.
 
 ## Nicht im MVP
 

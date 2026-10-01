@@ -39,6 +39,10 @@ export interface AppSettings {
   paperSize: string
   /** Periodically check GitHub Releases for updates (packaged builds only) */
   autoCheckUpdates: boolean
+  /** Destination folder for the action-bar export/copy button */
+  exportFolder: string | null
+  /** Custom label for the export button (e.g. "T2 med exportieren") */
+  exportButtonLabel: string
   // Scan folder reserved for a later release — not used in MVP.
   // scanFolder: string | null
 }
@@ -76,6 +80,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   copies: 1,
   paperSize: 'A4',
   autoCheckUpdates: true,
+  exportFolder: null,
+  exportButtonLabel: 'In Ordner kopieren',
 }
 
 /** Unique non-empty folder list; prefer faxFolders, fall back to legacy faxFolder. */
