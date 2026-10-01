@@ -95,9 +95,9 @@ for desktop in /usr/share/applications/fax-inbox.desktop /usr/share/applications
 done
 shopt -u nullglob
 
-# Pixmap fallback for DEs that ignore hicolor 1024-only installs.
-# NOTE: Do NOT use ${var} here — electron-builder FpmTarget treats ${...} as
-# packaging macros and fails with "Macro sz is not defined".
+# Pixmap fallback for DEs that ignore very large-only hicolor installs.
+# Avoid dollar-brace shell expansions in this file: electron-builder substitutes
+# them as packaging macros and aborts the .deb build.
 mkdir -p /usr/share/pixmaps 2>/dev/null || true
 for sz in 256 128 64 48 512 1024; do
   src=/usr/share/icons/hicolor/"$sz"x"$sz"/apps/fax-inbox.png
