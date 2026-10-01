@@ -198,14 +198,20 @@ Die installierte App prüft beim Start (nach ~10 s) und alle 4 Stunden auf U
 
 ## Ubuntu: App startet nicht / klicken tut nichts
 
-**Sofort-Fix** (häufigste Ursache — `chrome-sandbox` ohne root/setuid):
+**Sofort-Fix** (häufigste Ursache — `chrome-sandbox` / AppArmor; App startet und bricht sofort ab):
 
 ```bash
+# 1) Sandbox-Rechte
 sudo chown root:root "/opt/Fax Inbox/chrome-sandbox"
 sudo chmod 4755 "/opt/Fax Inbox/chrome-sandbox"
+
+# 2) Im Terminal starten (zeigt Fehler statt still zu sterben):
 fax-inbox --no-sandbox
+# oder:
+"/opt/Fax Inbox/fax-inbox" --no-sandbox
 ```
 
+Falls das hilft: ab **0.3.4** setzt der `.deb`-Installer automatisch einen Wrapper mit `--no-sandbox`. Neueste `.deb` von den [Releases](https://github.com/AniGerm/Inbox/releases) installieren.
 1. Im Terminal starten (zeigt Fehler statt still zu sterben):
 
 ```bash
