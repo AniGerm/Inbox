@@ -50,6 +50,7 @@ export type UpdateStatusEvent =
   | { type: 'update-not-available'; version?: string }
   | { type: 'download-progress'; percent: number }
   | { type: 'update-downloaded'; version: string }
+  | { type: 'installing'; version?: string }
   | { type: 'error'; message: string }
 
 export interface InboxStateFile {
