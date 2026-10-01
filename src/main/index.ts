@@ -93,6 +93,8 @@ function createWindow(): BrowserWindow {
     title: 'Fax Inbox',
     backgroundColor: '#f2f5fa',
     show: false,
+    // No Electron File/Edit/View chrome on Windows/Ubuntu
+    autoHideMenuBar: true,
     ...(icon ? { icon } : {}),
     webPreferences: {
       preload: preloadPath(),
@@ -638,6 +640,12 @@ if (!gotSingleInstanceLock) {
   })
 
   app.whenReady().then(() => {
+    // Drop the default Electron File / Edit / View / Window / Help bar
+    // (Windows + Ubuntu). Keep macOS menu for platform conventions.
+    if (process.platform === 'win32' || process.platform === 'linux') {
+      Menu.setApplicationMenu(null)
+    }
+
     registerIpc()
     mainWindow = createWindow()
     initUpdater(() => mainWindow, {
