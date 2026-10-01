@@ -278,20 +278,35 @@ async function listWindowsPrinters(): Promise<ListedPrinter[]> {
   }
 }
 
+/** Force English CUPS messages so parsers stay locale-independent. */
+function cupsEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    LANG: 'C',
+    LC_ALL: 'C',
+    LANGUAGE: 'C',
+  }
+}
+
 /** CUPS queue list via lpstat (Ubuntu / Linux). */
 async function listCupsPrinters(): Promise<ListedPrinter[]> {
   try {
     const { stdout: accepting } = await execFileAsync('lpstat', ['-a'], {
       encoding: 'utf8',
       timeout: 15_000,
+      env: cupsEnv(),
     })
     let defaultName: string | null = null
     try {
       const { stdout: defOut } = await execFileAsync('lpstat', ['-d'], {
         encoding: 'utf8',
         timeout: 10_000,
+        env: cupsEnv(),
       })
-      const m = defOut.match(/system default destination:\s*(.+)\s*$/im)
+      const m =
+        defOut.match(/system default destination:\s*(.+)\s*$/im) ??
+        defOut.match(/Systemstandardzielort:\s*(.+)\s*$/im) ??
+        defOut.match(/standardzielort[^:]*:\s*(.+)\s*$/im)
       if (m?.[1]) defaultName = m[1].trim()
     } catch {
       /* no default configured */
@@ -299,7 +314,15 @@ async function listCupsPrinters(): Promise<ListedPrinter[]> {
 
     const printers: ListedPrinter[] = []
     for (const line of accepting.split(/\r?\n/)) {
-      const m = line.match(/^(.+?)\s+accepting\s+requests/i)
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      // en: "Name accepting requests since …"
+      // de: "Name akzeptiert Anfragen seit …"
+      const m =
+        trimmed.match(/^(.+?)\s+accepting\s+requests\b/i) ??
+        trimmed.match(/^(.+?)\s+akzeptiert\s+Anfragen\b/i) ??
+        trimmed.match(/^(\S+)\s+(?:not\s+)?accepting\b/i) ??
+        trimmed.match(/^(\S+)\s+(?:akzeptiert|nimmt)\b/i)
       if (!m?.[1]) continue
       const name = m[1].trim()
       if (!name) continue
@@ -395,7 +418,11 @@ async function printViaCups(filePath: string, settings: AppSettings): Promise<vo
   ]
 
   try {
-    await execFileAsync('lp', args, { encoding: 'utf8', timeout: 60_000 })
+    await execFileAsync('lp', args, {
+      encoding: 'utf8',
+      timeout: 60_000,
+      env: cupsEnv(),
+    })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     throw new Error(
