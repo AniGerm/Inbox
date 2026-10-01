@@ -23,8 +23,9 @@ Danach aktualisiert sich die App bei neueren Releases selbst (Hinweis in der App
 
 ### Ubuntu (einfach)
 
-1. Auf der [Releases-Seite](https://github.com/AniGerm/Inbox/releases) die neueste Version öffnen (falls Linux-Artefakte veröffentlicht sind).
-2. **`.deb`** herunterladen und installieren, z. B.:
+1. Auf der [Releases-Seite](https://github.com/AniGerm/Inbox/releases) die neueste Version öffnen.
+2. Unter **Assets** die Datei **`Fax-Inbox-….deb`** herunterladen.
+3. Installieren:
 
 ```bash
 sudo apt install ./Fax-Inbox-*.deb
@@ -32,15 +33,9 @@ sudo apt install ./Fax-Inbox-*.deb
 sudo dpkg -i Fax-Inbox-*.deb
 ```
 
-3. Im Anwendungsmenü **Fax Inbox** starten — oder `fax-inbox` im Terminal.
+4. Im Anwendungsmenü **Fax Inbox** starten — oder `fax-inbox` im Terminal.
 
-Falls nur ein **AppImage** liegt:
-
-```bash
-chmod +x Fax-Inbox-*.AppImage
-./Fax-Inbox-*.AppImage
-```
-
+Optional portable: **`Fax-Inbox-….AppImage`** herunterladen, `chmod +x` und starten.
 ---
 
 ## Installation aus dem Quellcode (optional)
@@ -158,9 +153,9 @@ Installationspfad typisch: `%LOCALAPPDATA%\Programs\fax-inbox\Fax Inbox.exe`
 | OS | Artefakte (Release / Build) | Integration |
 | --- | --- | --- |
 | Windows | `Fax-Inbox-Setup-….exe` (NSIS) auf [Releases](https://github.com/AniGerm/Inbox/releases) | Startmenü + Desktop; **Auto-Update** |
-| Ubuntu | `.deb` + `.AppImage` (wenn im Release oder lokal gebaut) | `.deb` → App-Menü; AppImage → portable |
+| Ubuntu | `Fax-Inbox-….deb` + `.AppImage` auf [Releases](https://github.com/AniGerm/Inbox/releases) | `.deb` → App-Menü; AppImage → portable |
 
-> **Hinweis Auto-Update:** Nur der **NSIS-Installer** von GitHub Releases unterstützt Updates (`latest.yml` + `.blockmap`). Portable-Builds aktualisieren sich nicht selbst.
+> **Hinweis Auto-Update:** Nur der **NSIS-Installer** von GitHub Releases unterstützt Updates (`latest.yml` + `.blockmap`). Portable-Builds und `.deb` aktualisieren sich nicht von selbst über electron-updater.
 
 ## Release veröffentlichen (Maintainer)
 
@@ -176,7 +171,12 @@ git push origin v0.3.0
 # oder: git push --tags
 ```
 
-Die Action `.github/workflows/release.yml` baut den Windows-NSIS-Installer und hängt ihn an das Release (`Fax-Inbox-Setup-….exe`, `latest.yml`, `.blockmap`).
+Die Action `.github/workflows/release.yml` baut parallel:
+
+- **Windows:** NSIS-Setup (`Fax-Inbox-Setup-….exe`, `latest.yml`, `.blockmap`)
+- **Ubuntu:** `.deb` + `.AppImage` (`Fax-Inbox-….deb`, `Fax-Inbox-….AppImage`)
+
+und hängt alles an dasselbe GitHub Release.
 
 Alternativ lokal bauen und manuell hochladen:
 
