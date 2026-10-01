@@ -33,12 +33,13 @@ if [ -n "$APP_DIR" ] && [ -e "$APP_DIR/fax-inbox" ]; then
   if file "$APP_DIR/fax-inbox" | grep -q 'ELF'; then
     cat > /usr/bin/fax-inbox <<EOF
 #!/bin/bash
-if [ "\$1" = "__FAX_INBOX_LAUNCHED__" ]; then
+if [ -n "\$FAX_INBOX_WRAPPER_ACTIVE" ]; then
   echo "FATAL: recursive launch detected (broken /opt install)" >&2
   exit 1
 fi
+export FAX_INBOX_WRAPPER_ACTIVE=1
 export ELECTRON_DISABLE_SANDBOX=1
-exec "$APP_DIR/fax-inbox" --no-sandbox "__FAX_INBOX_LAUNCHED__" "\$@"
+exec "$APP_DIR/fax-inbox" --no-sandbox "\$@"
 EOF
     chmod 755 /usr/bin/fax-inbox || true
   else
