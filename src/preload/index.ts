@@ -24,7 +24,8 @@ const api = {
   pickExportFolder: (): Promise<string | null> => ipcRenderer.invoke('pick-export-folder'),
   exportFax: (
     filePath: string,
-  ): Promise<{ ok: true; dest: string }> => ipcRenderer.invoke('export-fax', filePath),
+  ): Promise<{ ok: true; dest: string; items: FaxItem[] }> =>
+    ipcRenderer.invoke('export-fax', filePath),
   getInbox: (): Promise<InboxSnapshot> => ipcRenderer.invoke('get-inbox'),
   markSeen: (filePath: string): Promise<FaxItem[]> => ipcRenderer.invoke('mark-seen', filePath),
   markUnseen: (filePath: string): Promise<FaxItem[]> => ipcRenderer.invoke('mark-unseen', filePath),

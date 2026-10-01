@@ -402,21 +402,29 @@ function registerIpc(): void {
         'Kein Exportordner gesetzt. Bitte unter Einstellungen einen Ordner wählen.',
       )
     }
-    fs.mkdirSync(destDir, { recursive: true })
-    const base = path.basename(filePath)
-    let dest = path.join(destDir, base)
-    if (fs.existsSync(dest)) {
-      const ext = path.extname(base)
-      const stem = path.basename(base, ext)
-      const stamp = new Date()
-        .toISOString()
-        .replace(/[:.]/g, '-')
-        .replace('T', '_')
-        .slice(0, 19)
-      dest = path.join(destDir, `${stem}_${stamp}${ext}`)
+
+    watcher?.setExportStatus(filePath, 'exporting')
+    try {
+      fs.mkdirSync(destDir, { recursive: true })
+      const base = path.basename(filePath)
+      let dest = path.join(destDir, base)
+      if (fs.existsSync(dest)) {
+        const ext = path.extname(base)
+        const stem = path.basename(base, ext)
+        const stamp = new Date()
+          .toISOString()
+          .replace(/[:.]/g, '-')
+          .replace('T', '_')
+          .slice(0, 19)
+        dest = path.join(destDir, `${stem}_${stamp}${ext}`)
+      }
+      fs.copyFileSync(filePath, dest)
+      const items = watcher?.setExportStatus(filePath, 'exported') ?? latestItems
+      return { ok: true as const, dest, items }
+    } catch (err) {
+      watcher?.setExportStatus(filePath, 'error')
+      throw err
     }
-    fs.copyFileSync(filePath, dest)
-    return { ok: true as const, dest }
   })
 
   ipcMain.handle('get-inbox', () => ({
