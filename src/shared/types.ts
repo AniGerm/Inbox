@@ -33,9 +33,9 @@ export interface AppSettings {
   faxFolders: string[]
   notificationsEnabled: boolean
   autostart: boolean
-  /** external = open PDF in OS default app; direct = silent print to fixed printer (Windows) */
+  /** external = open PDF in OS default app; direct = silent print to fixed printer */
   printMethod: PrintMethod
-  /** Windows direct print target; empty = not configured */
+  /** Direct print target (Windows / Ubuntu); empty = not configured */
   printerName: string
   duplex: DuplexMode
   /** false = monochrome / black & white */
