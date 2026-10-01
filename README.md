@@ -198,21 +198,24 @@ Die installierte App prüft beim Start (nach ~10 s) und alle 4 Stunden auf U
 
 ## Ubuntu: App startet nicht / klicken tut nichts
 
-**Sofort-Fix** (häufigste Ursache — `chrome-sandbox` / AppArmor; App startet und bricht sofort ab):
+**Sofort-Fix** (häufigste Ursache — kaputte Desktop-`Exec` / Sandbox; App startet und bricht sofort ab):
 
 ```bash
-# 1) Sandbox-Rechte
-sudo chown root:root "/opt/Fax Inbox/chrome-sandbox"
-sudo chmod 4755 "/opt/Fax Inbox/chrome-sandbox"
+# Wrapper + Menüeintrag reparieren (einmalig, auch für 0.3.2–0.3.6)
+sudo tee /usr/bin/fax-inbox >/dev/null <<'EOF'
+#!/bin/bash
+export ELECTRON_DISABLE_SANDBOX=1
+exec "/opt/Fax Inbox/fax-inbox" --no-sandbox "$@"
+EOF
+sudo chmod 755 /usr/bin/fax-inbox
+sudo sed -i 's|^Exec=.*|Exec=fax-inbox %U|' /usr/share/applications/fax-inbox.desktop
+sudo update-desktop-database /usr/share/applications
 
-# 2) Im Terminal starten (zeigt Fehler statt still zu sterben):
-fax-inbox --no-sandbox
-# oder:
-"/opt/Fax Inbox/fax-inbox" --no-sandbox
+# Test im Terminal:
+fax-inbox
 ```
 
-Falls das hilft: ab **0.3.4** setzt der `.deb`-Installer automatisch einen Wrapper mit `--no-sandbox`. Neueste `.deb` von den [Releases](https://github.com/AniGerm/Inbox/releases) installieren.
-1. Im Terminal starten (zeigt Fehler statt still zu sterben):
+Ab **0.3.7** macht der `.deb`-Installer das automatisch (früherer sed-Patch zerlegte den Pfad mit Leerzeichen). Neueste `.deb`: [Releases](https://github.com/AniGerm/Inbox/releases).1. Im Terminal starten (zeigt Fehler statt still zu sterben):
 
 ```bash
 fax-inbox --no-sandbox
