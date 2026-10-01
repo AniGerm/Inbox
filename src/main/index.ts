@@ -433,6 +433,14 @@ function registerIpc(): void {
 // quit silently while an invisible first process still holds the lock.
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) {
+  // Another instance is already running — most likely an OLD binary that was
+  // installed before the .deb upgrade. Exit silently; the running instance
+  // will be focused by the OS or by our second-instance handler below.
+  console.warn(
+    `[Fax Inbox] Second instance detected (this binary: ${app.getVersion()}). ` +
+      `Exiting. If you just installed an update, quit the running app from the ` +
+      `tray menu ("Beenden") and start Fax Inbox again.`,
+  )
   app.exit(0)
 } else {
   app.on('second-instance', () => {

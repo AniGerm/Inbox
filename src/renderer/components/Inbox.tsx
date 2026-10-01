@@ -130,6 +130,23 @@ function printStatusLabel(item: FaxItem): string {
   }
 }
 
+function PrinterIcon({ slashed = false }: { slashed?: boolean }) {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M7 9V5h10v4M7 15H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M7 14h10v5H7v-5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      {slashed ? (
+        <path d="M4 20 20 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      ) : null}
+    </svg>
+  )
+}
+
 function PrintStatusIcon({ status }: { status: PrintStatus }) {
   if (status === 'printing') {
     return (
@@ -167,18 +184,7 @@ function PrintStatusIcon({ status }: { status: PrintStatus }) {
     )
   }
   // none — printer with slash
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M7 9V5h10v4M7 15H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <path d="M7 14h10v5H7v-5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-      <path d="M4 20 20 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
+  return <PrinterIcon slashed />
 }
 
 export default function Inbox({
@@ -461,7 +467,12 @@ export default function Inbox({
                         >
                           <PrintStatusIcon status={printStatus} />
                           {printedShort ? (
-                            <span className="print-status-time">{printedShort}</span>
+                            <span className="print-status-meta">
+                              <span className="print-status-printer" aria-hidden>
+                                <PrinterIcon />
+                              </span>
+                              <span className="print-status-time">{printedShort}</span>
+                            </span>
                           ) : null}
                         </span>
                         <span className="item-meta" title={`Empfangen ${formatPrintedAt(item.addedAt)}`}>

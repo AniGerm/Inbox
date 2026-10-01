@@ -308,6 +308,19 @@ button {
   text-align: right;
 }
 
+.print-status-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 120px;
+}
+
+.print-status-printer {
+  display: inline-flex;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
 .print-status.is-printing {
   color: var(--accent);
 }
@@ -318,6 +331,10 @@ button {
 
 .print-status.is-printed .print-status-time {
   color: color-mix(in srgb, #1a7f4b 55%, var(--text-faint));
+}
+
+.print-status.is-printed .print-status-printer {
+  color: color-mix(in srgb, #1a7f4b 70%, var(--text-faint));
 }
 
 .print-status.is-error {
