@@ -287,12 +287,24 @@ button {
   grid-row: 1 / span 2;
   align-self: center;
   display: inline-flex;
-  width: 16px;
-  height: 16px;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-end;
   justify-content: center;
+  gap: 2px;
+  min-width: 16px;
   color: var(--text-faint);
   flex-shrink: 0;
+}
+
+.print-status-time {
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .print-status.is-printing {
@@ -301,6 +313,10 @@ button {
 
 .print-status.is-printed {
   color: #1a7f4b;
+}
+
+.print-status.is-printed .print-status-time {
+  color: color-mix(in srgb, #1a7f4b 55%, var(--text-faint));
 }
 
 .print-status.is-error {
@@ -576,13 +592,13 @@ button {
 }
 
 .settings-panel {
-  width: min(480px, calc(100% - 32px));
-  max-height: min(90vh, 720px);
+  width: min(600px, calc(100% - 32px));
+  max-height: min(92vh, 820px);
   overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 22px 24px 20px;
+  padding: 24px 28px 22px;
   box-shadow: 0 16px 40px rgba(28, 27, 25, 0.12);
   animation: slide-in 200ms ease;
 }

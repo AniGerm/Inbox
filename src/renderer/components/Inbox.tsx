@@ -55,10 +55,11 @@ function groupByDay(items: FaxItem[]): Array<{ key: DayBucket; label: string; it
 function formatWhen(iso: string, bucket: DayBucket): string {
   const d = new Date(iso)
   if (bucket === 'heute' || bucket === 'gestern' || bucket === 'vorgestern') {
-    return new Intl.DateTimeFormat('de-DE', {
+    const time = new Intl.DateTimeFormat('de-DE', {
       hour: '2-digit',
       minute: '2-digit',
     }).format(d)
+    return `${time} Uhr`
   }
   return new Intl.DateTimeFormat('de-DE', {
     day: '2-digit',
@@ -77,6 +78,42 @@ function formatPrintedAt(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(iso))
+}
+
+/** Compact print time for sidebar under the status icon */
+function formatPrintedAtShort(iso: string): string {
+  const d = new Date(iso)
+  const now = new Date()
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  if (sameDay) {
+    return new Intl.DateTimeFormat('de-DE', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(d)
+  }
+  return new Intl.DateTimeFormat('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d)
+}
+
+function formatReprintConfirm(printedAt: string): string {
+  const d = new Date(printedAt)
+  const date = new Intl.DateTimeFormat('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+  }).format(d)
+  const time = new Intl.DateTimeFormat('de-DE', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d)
+  return `Du hast dieses Dokument bereits am ${date} um ${time} Uhr gedruckt.\n\nMöchtest du es erneut drucken?`
 }
 
 function printStatusLabel(item: FaxItem): string {
@@ -215,6 +252,13 @@ export default function Inbox({
 
   const print = useCallback(async () => {
     if (!selectedVisible) return
+    if (
+      selectedVisible.printStatus === 'printed' &&
+      selectedVisible.printedAt
+    ) {
+      const ok = window.confirm(formatReprintConfirm(selectedVisible.printedAt))
+      if (!ok) return
+    }
     try {
       await window.faxInbox.printPreview(selectedVisible.path)
     } catch (err) {
@@ -391,6 +435,10 @@ export default function Inbox({
                     const selectedCls = item.path === selectedPath ? 'is-selected' : ''
                     const printStatus: PrintStatus = item.printStatus ?? 'none'
                     const printLabel = printStatusLabel(item)
+                    const printedShort =
+                      printStatus === 'printed' && item.printedAt
+                        ? formatPrintedAtShort(item.printedAt)
+                        : null
                     return (
                       <button
                         key={item.path}
@@ -409,8 +457,13 @@ export default function Inbox({
                           aria-label={printLabel}
                         >
                           <PrintStatusIcon status={printStatus} />
+                          {printedShort ? (
+                            <span className="print-status-time">{printedShort}</span>
+                          ) : null}
                         </span>
-                        <span className="item-meta">{formatWhen(item.addedAt, group.key)}</span>
+                        <span className="item-meta" title={`Empfangen ${formatPrintedAt(item.addedAt)}`}>
+                          {formatWhen(item.addedAt, group.key)}
+                        </span>
                       </button>
                     )
                   })}
