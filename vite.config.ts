@@ -14,7 +14,7 @@ export default defineConfig({
             outDir: 'dist-electron',
             emptyOutDir: true,
             rollupOptions: {
-              external: ['electron', 'chokidar', 'pdf-to-printer'],
+              external: ['electron', 'chokidar', 'pdf-to-printer', 'electron-updater'],
               output: {
                 entryFileNames: 'main.js',
                 format: 'cjs',

@@ -62,6 +62,10 @@ export function loadSettings(): AppSettings {
       typeof raw.paperSize === 'string' && raw.paperSize.trim()
         ? raw.paperSize.trim()
         : DEFAULT_SETTINGS.paperSize,
+    autoCheckUpdates:
+      typeof raw.autoCheckUpdates === 'boolean'
+        ? raw.autoCheckUpdates
+        : DEFAULT_SETTINGS.autoCheckUpdates,
   }
 }
 

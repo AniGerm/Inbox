@@ -17,6 +17,7 @@ import {
   focusMainWindow,
 } from './notifications'
 import type { AppSettings, FaxItem } from '../shared/types'
+import { initUpdater, setPrintingInProgress } from './updater'
 
 // Linux: Chromium setuid/userns sandbox often aborts before any window on
 // Ubuntu (AppImage/AppArmor). Must be set before app ready.
@@ -303,6 +304,7 @@ async function printFax(filePath?: string): Promise<void> {
   const method = settings.printMethod ?? 'external'
 
   watcher?.setPrintStatus(resolved, 'printing')
+  setPrintingInProgress(true)
 
   try {
     if (method === 'direct') {
@@ -318,6 +320,8 @@ async function printFax(filePath?: string): Promise<void> {
   } catch (err) {
     watcher?.setPrintStatus(resolved, 'error')
     throw err
+  } finally {
+    setPrintingInProgress(false)
   }
 }
 
@@ -426,6 +430,7 @@ if (!gotSingleInstanceLock) {
   app.whenReady().then(() => {
     registerIpc()
     mainWindow = createWindow()
+    initUpdater(() => mainWindow)
 
     try {
       tray = new Tray(loadTrayIconFromFile(0))
