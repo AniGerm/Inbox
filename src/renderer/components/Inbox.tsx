@@ -55,13 +55,13 @@ function groupByDay(items: FaxItem[]): Array<{ key: DayBucket; label: string; it
 
 function formatWhen(iso: string, bucket: DayBucket): string {
   const d = new Date(iso)
-  if (bucket === 'heute' || bucket === 'gestern' || bucket === 'vorgestern') {
-    const time = new Intl.DateTimeFormat('de-DE', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(d)
-    return `${time} Uhr`
-  }
+  const time = new Intl.DateTimeFormat('de-DE', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d)
+  if (bucket === 'heute') return `heute, ${time} Uhr`
+  if (bucket === 'gestern') return `gestern, ${time} Uhr`
+  if (bucket === 'vorgestern') return `vorgestern, ${time} Uhr`
   return new Intl.DateTimeFormat('de-DE', {
     day: '2-digit',
     month: '2-digit',
@@ -84,17 +84,14 @@ function formatPrintedAt(iso: string): string {
 /** Compact print time for sidebar under the status icon */
 function formatPrintedAtShort(iso: string): string {
   const d = new Date(iso)
-  const now = new Date()
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  if (sameDay) {
-    return new Intl.DateTimeFormat('de-DE', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(d)
-  }
+  const time = new Intl.DateTimeFormat('de-DE', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d)
+  const bucket = bucketFor(iso)
+  if (bucket === 'heute') return `heute ${time}`
+  if (bucket === 'gestern') return `gestern ${time}`
+  if (bucket === 'vorgestern') return `vorgestern ${time}`
   return new Intl.DateTimeFormat('de-DE', {
     day: '2-digit',
     month: '2-digit',
