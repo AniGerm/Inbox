@@ -35,9 +35,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Build only — publish in a final job so Win+Linux don't race on the same tag
+      # Build only — publish in a final job so Win+Linux don't race on the same tag.
+      # signAndEditExecutable=true embeds icon.ico into the .exe (false leaves the
+      # Electron default logo). Local Windows builds keep false to avoid winCodeSign
+      # download hangs under Defender; CI is fine with CSC discovery off.
       - name: Build Windows NSIS installer
-        run: npm run build && npx electron-builder --win --x64 --publish never
+        run: >
+          npm run build &&
+          npx electron-builder --win --x64 --publish never
+          --config.win.signAndEditExecutable=true
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 

@@ -157,7 +157,6 @@ export async function downloadDebUpdate(
   onProgress?: (percent: number) => void,
 ): Promise<string> {
   const dest = debDownloadPath(info.debName)
-  // Remove stale partial downloads
   try {
     if (fs.existsSync(dest)) fs.unlinkSync(dest)
   } catch {
@@ -169,34 +168,102 @@ export async function downloadDebUpdate(
 
 /**
  * Quit the app and install the .deb via pkexec (password dialog), then relaunch.
+ * Uses setsid + a script file so the installer survives Electron's process exit.
  */
 export function quitAndInstallDeb(
   debPath: string,
   prepareForQuit: () => void,
 ): void {
   const qDeb = shellSingleQuote(debPath)
-  const script = [
-    'set -e',
-    `DEB=${qDeb}`,
-    'if command -v apt-get >/dev/null 2>&1; then',
-    '  pkexec apt-get install -y --reinstall "$DEB"',
-    'else',
-    '  pkexec dpkg -i "$DEB"',
-    'fi',
-    'sleep 1',
-    'if command -v gtk-launch >/dev/null 2>&1; then',
-    '  gtk-launch fax-inbox >/dev/null 2>&1 &',
-    'elif command -v fax-inbox >/dev/null 2>&1; then',
-    '  nohup fax-inbox --no-sandbox >/dev/null 2>&1 &',
-    'fi',
-  ].join('\n')
+  const qDisplay = shellSingleQuote(process.env.DISPLAY || ':0')
+  const qXdg = shellSingleQuote(
+    process.env.XDG_RUNTIME_DIR || `/run/user/${typeof process.getuid === 'function' ? process.getuid() : 1000}`,
+  )
+  const qHome = shellSingleQuote(process.env.HOME || '')
+  const qUser = shellSingleQuote(process.env.USER || process.env.LOGNAME || '')
+  const qDbus = process.env.DBUS_SESSION_BUS_ADDRESS
+    ? `export DBUS_SESSION_BUS_ADDRESS=${shellSingleQuote(process.env.DBUS_SESSION_BUS_ADDRESS)}`
+    : ''
+  const qWayland = process.env.WAYLAND_DISPLAY
+    ? `export WAYLAND_DISPLAY=${shellSingleQuote(process.env.WAYLAND_DISPLAY)}`
+    : ''
+
+  const script = `#!/bin/bash
+# Keep running after Fax Inbox exits
+trap '' HUP
+exec >>/tmp/fax-inbox-update.log 2>&1
+echo "==== $(date -Is) update install start ===="
+set -x
+
+DEB=${qDeb}
+export DISPLAY=${qDisplay}
+export XDG_RUNTIME_DIR=${qXdg}
+export HOME=${qHome}
+export USER=${qUser}
+export LOGNAME=${qUser}
+${qDbus}
+${qWayland}
+
+# Install (shows password dialog). Do not use set -e — we always try to relaunch.
+if command -v apt-get >/dev/null 2>&1; then
+  pkexec env DEBIAN_FRONTEND=noninteractive apt-get install -y --reinstall "$DEB" \\
+    || pkexec dpkg -i "$DEB" \\
+    || true
+else
+  pkexec dpkg -i "$DEB" || true
+fi
+
+# Give postinst / desktop database a moment
+sleep 2
+
+# Relaunch as the original user session (never as root)
+relaunch() {
+  if command -v gio >/dev/null 2>&1 && [ -f /usr/share/applications/fax-inbox.desktop ]; then
+    gio launch /usr/share/applications/fax-inbox.desktop && return 0
+  fi
+  if command -v gtk-launch >/dev/null 2>&1; then
+    gtk-launch fax-inbox && return 0
+  fi
+  if [ -x /usr/bin/fax-inbox ]; then
+    nohup /usr/bin/fax-inbox >/tmp/fax-inbox-relaunch.log 2>&1 &
+    disown || true
+    return 0
+  fi
+  if command -v fax-inbox >/dev/null 2>&1; then
+    nohup fax-inbox >/tmp/fax-inbox-relaunch.log 2>&1 &
+    disown || true
+    return 0
+  fi
+  return 1
+}
+
+for _try in 1 2 3 4 5; do
+  if relaunch; then
+    echo "relaunch ok (try $_try)"
+    exit 0
+  fi
+  sleep 1
+done
+
+echo "relaunch failed"
+exit 1
+`
+
+  const scriptPath = path.join(app.getPath('temp'), 'fax-inbox-install-update.sh')
+  fs.writeFileSync(scriptPath, script, { encoding: 'utf8', mode: 0o755 })
 
   prepareForQuit()
-  const child = spawn('bash', ['-c', script], {
+
+  // setsid: new session so Electron quitting does not SIGHUP the installer
+  const child = spawn('setsid', ['bash', scriptPath], {
     detached: true,
     stdio: 'ignore',
     env: process.env,
   })
   child.unref()
-  app.quit()
+
+  // Brief delay so setsid/bash is running before we tear down the app
+  setTimeout(() => {
+    app.quit()
+  }, 400)
 }

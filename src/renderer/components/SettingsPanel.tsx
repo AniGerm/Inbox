@@ -107,6 +107,12 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
   const [autoCheckUpdates, setAutoCheckUpdates] = useState(
     settings.autoCheckUpdates !== false,
   )
+  const [exportFolder, setExportFolder] = useState(settings.exportFolder ?? '')
+  const [exportButtonLabel, setExportButtonLabel] = useState(
+    settings.exportButtonLabel?.trim()
+      ? settings.exportButtonLabel
+      : 'In Ordner kopieren',
+  )
   const [printMethod, setPrintMethod] = useState<PrintMethod>(
     settings.printMethod === 'direct' ? 'direct' : 'external',
   )
@@ -189,6 +195,13 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
     })
   }
 
+  const pickExport = async () => {
+    if (typeof window.faxInbox.pickExportFolder !== 'function') return
+    const chosen = await window.faxInbox.pickExportFolder()
+    if (!chosen) return
+    setExportFolder(chosen)
+  }
+
   const addFolder = () => {
     setFaxFolders((prev) => [...prev, ''])
   }
@@ -216,6 +229,8 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
         notificationsEnabled,
         autostart,
         autoCheckUpdates,
+        exportFolder: exportFolder.trim() || null,
+        exportButtonLabel: exportButtonLabel.trim() || 'In Ordner kopieren',
         printMethod: method,
         printerName: printerName.trim(),
         duplex,
@@ -328,6 +343,45 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
           >
             + Ordner hinzufügen
           </button>
+        </div>
+
+        <div className="field">
+          <span className="field-label" id="export-folder-label">
+            Export / Kopieren
+          </span>
+          <p className="field-hint">
+            Zusätzlicher Button neben <strong>Drucken</strong>: kopiert das gewählte Fax dauerhaft
+            in einen Ordner deiner Wahl (z. B. T2 med, Dokumente, …). Name des Buttons ist frei
+            wählbar.
+          </p>
+          <label htmlFor="export-button-label">Button-Beschriftung</label>
+          <input
+            id="export-button-label"
+            value={exportButtonLabel}
+            onChange={(e) => setExportButtonLabel(e.target.value)}
+            placeholder="In Ordner kopieren"
+            aria-labelledby="export-folder-label"
+          />
+          <label htmlFor="export-folder" style={{ marginTop: 10 }}>
+            Zielordner
+          </label>
+          <div className="path-field">
+            <input
+              id="export-folder"
+              value={exportFolder}
+              onChange={(e) => setExportFolder(e.target.value)}
+              placeholder="Ordner zum Kopieren wählen"
+            />
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => void pickExport()}
+              title="Ordner wählen"
+              aria-label="Exportordner wählen"
+            >
+              …
+            </button>
+          </div>
         </div>
 
         <div className="field print-settings">

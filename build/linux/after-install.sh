@@ -86,11 +86,31 @@ for desktop in /usr/share/applications/fax-inbox.desktop /usr/share/applications
   if grep -q '^Exec=' "$desktop"; then
     sed -i 's|^Exec=.*|Exec=fax-inbox %U|' "$desktop" || true
   fi
+  # Ensure Icon= is set (menu would otherwise show a generic gear)
+  if grep -q '^Icon=' "$desktop"; then
+    sed -i 's|^Icon=.*|Icon=fax-inbox|' "$desktop" || true
+  else
+    printf '\nIcon=fax-inbox\n' >> "$desktop" || true
+  fi
 done
 shopt -u nullglob
 
+# Pixmap fallback for DEs that ignore hicolor 1024-only installs
+mkdir -p /usr/share/pixmaps 2>/dev/null || true
+for sz in 256 128 64 48 512 1024; do
+  src="/usr/share/icons/hicolor/${sz}x${sz}/apps/fax-inbox.png"
+  if [ -f "$src" ]; then
+    cp -f "$src" /usr/share/pixmaps/fax-inbox.png 2>/dev/null || true
+    break
+  fi
+done
+
 if command -v update-desktop-database >/dev/null 2>&1; then
   update-desktop-database /usr/share/applications >/dev/null 2>&1 || true
+fi
+
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+  gtk-update-icon-cache -f /usr/share/icons/hicolor >/dev/null 2>&1 || true
 fi
 
 exit 0

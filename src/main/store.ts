@@ -73,6 +73,14 @@ export function loadSettings(): AppSettings {
       typeof raw.autoCheckUpdates === 'boolean'
         ? raw.autoCheckUpdates
         : DEFAULT_SETTINGS.autoCheckUpdates,
+    exportFolder:
+      typeof raw.exportFolder === 'string' && raw.exportFolder.trim()
+        ? raw.exportFolder.trim()
+        : null,
+    exportButtonLabel:
+      typeof raw.exportButtonLabel === 'string' && raw.exportButtonLabel.trim()
+        ? raw.exportButtonLabel.trim()
+        : DEFAULT_SETTINGS.exportButtonLabel,
   }
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "fax-inbox",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "description": "Fax Inbox – Desktop-Inbox für eingehende Fax-PDFs",
   "main": "dist-electron/main.js",
   "homepage": "https://github.com/AniGerm/Inbox",
@@ -82,7 +82,10 @@
       "shortcutName": "Fax Inbox",
       "runAfterFinish": true,
       "uninstallDisplayName": "Fax Inbox",
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "resources/icon.ico",
+      "uninstallerIcon": "resources/icon.ico",
+      "installerHeaderIcon": "resources/icon.ico"
     },
     "linux": {
       "target": [
@@ -90,7 +93,7 @@
         "deb"
       ],
       "category": "Office",
-      "icon": "resources/icon.png",
+      "icon": "resources/icons",
       "executableName": "fax-inbox",
       "executableArgs": [
         "--no-sandbox"

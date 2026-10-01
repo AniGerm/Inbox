@@ -11,6 +11,8 @@ type Props = {
   unreadCount: number
   faxFolder: string
   faxFolders?: string[]
+  exportButtonLabel: string
+  exportFolder: string | null
   focusPath: string | null
   focusNewestToken: number
   onOpenSettings: () => void
@@ -192,6 +194,8 @@ export default function Inbox({
   unreadCount,
   faxFolder,
   faxFolders,
+  exportButtonLabel,
+  exportFolder,
   focusPath,
   focusNewestToken,
   onOpenSettings,
@@ -201,6 +205,7 @@ export default function Inbox({
   const [view, setView] = useState<ViewMode>('inbox')
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [renaming, setRenaming] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
 
   const visible = useMemo(
@@ -272,6 +277,28 @@ export default function Inbox({
       window.alert(`Drucken fehlgeschlagen:\n\n${msg}`)
     }
   }, [selectedVisible])
+
+  const exportCopy = useCallback(async () => {
+    if (!selectedVisible) return
+    if (!exportFolder?.trim()) {
+      const go = window.confirm(
+        'Noch kein Exportordner gesetzt.\n\nEinstellungen öffnen, um Ordner und Button-Namen festzulegen?',
+      )
+      if (go) onOpenSettings()
+      return
+    }
+    setExporting(true)
+    try {
+      const result = await window.faxInbox.exportFax(selectedVisible.path)
+      window.alert(`Kopiert nach:\n${result.dest}`)
+    } catch (err) {
+      console.error(err)
+      const msg = err instanceof Error ? err.message : 'Kopieren fehlgeschlagen'
+      window.alert(`Kopieren fehlgeschlagen:\n\n${msg}`)
+    } finally {
+      setExporting(false)
+    }
+  }, [selectedVisible, exportFolder, onOpenSettings])
 
   const remove = useCallback(async () => {
     if (!selectedVisible) return
@@ -511,6 +538,21 @@ export default function Inbox({
                   onClick={() => void print()}
                 >
                   Drucken
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={exporting}
+                  title={
+                    exportFolder?.trim()
+                      ? `Kopiert nach: ${exportFolder}`
+                      : 'Exportordner in den Einstellungen festlegen'
+                  }
+                  onClick={() => void exportCopy()}
+                >
+                  {exporting
+                    ? 'Kopiere…'
+                    : exportButtonLabel.trim() || 'In Ordner kopieren'}
                 </button>
                 <button
                   type="button"

@@ -15,6 +15,7 @@ import {
   showNewFaxNotification,
   loadTrayIconFromFile,
   focusMainWindow,
+  resolveResource,
 } from './notifications'
 import type { AppSettings, FaxItem } from '../shared/types'
 import { normalizeFaxFolders } from '../shared/types'
@@ -67,7 +68,21 @@ function preloadPath(): string {
   return candidates[0]
 }
 
+function resolveWindowIcon(): string | undefined {
+  if (process.platform === 'win32') {
+    const ico = resolveResource('icon.ico')
+    if (fs.existsSync(ico)) return ico
+  }
+  // Prefer a mid-size PNG for window/taskbar chrome (1024 is heavy / ignored by some DEs)
+  for (const name of ['icons/256x256.png', 'icons/128x128.png', 'icon.png']) {
+    const p = resolveResource(name)
+    if (fs.existsSync(p)) return p
+  }
+  return undefined
+}
+
 function createWindow(): BrowserWindow {
+  const icon = resolveWindowIcon()
   const win = new BrowserWindow({
     width: 1100,
     height: 720,
@@ -76,6 +91,7 @@ function createWindow(): BrowserWindow {
     title: 'Fax Inbox',
     backgroundColor: '#f2f5fa',
     show: false,
+    ...(icon ? { icon } : {}),
     webPreferences: {
       preload: preloadPath(),
       contextIsolation: true,
@@ -361,6 +377,46 @@ function registerIpc(): void {
     })
     if (result.canceled || result.filePaths.length === 0) return null
     return result.filePaths[0]
+  })
+
+  ipcMain.handle('pick-export-folder', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      title: 'Exportordner wählen',
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle('export-fax', async (_e, filePath: string) => {
+    if (typeof filePath !== 'string' || !filePath.trim()) {
+      throw new Error('Keine Datei ausgewählt.')
+    }
+    if (!fs.existsSync(filePath)) {
+      throw new Error('Datei nicht gefunden.')
+    }
+    const settings = loadSettings()
+    const destDir = settings.exportFolder?.trim()
+    if (!destDir) {
+      throw new Error(
+        'Kein Exportordner gesetzt. Bitte unter Einstellungen einen Ordner wählen.',
+      )
+    }
+    fs.mkdirSync(destDir, { recursive: true })
+    const base = path.basename(filePath)
+    let dest = path.join(destDir, base)
+    if (fs.existsSync(dest)) {
+      const ext = path.extname(base)
+      const stem = path.basename(base, ext)
+      const stamp = new Date()
+        .toISOString()
+        .replace(/[:.]/g, '-')
+        .replace('T', '_')
+        .slice(0, 19)
+      dest = path.join(destDir, `${stem}_${stamp}${ext}`)
+    }
+    fs.copyFileSync(filePath, dest)
+    return { ok: true as const, dest }
   })
 
   ipcMain.handle('get-inbox', () => ({
