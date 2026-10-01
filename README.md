@@ -153,9 +153,9 @@ Installationspfad typisch: `%LOCALAPPDATA%\Programs\fax-inbox\Fax Inbox.exe`
 | OS | Artefakte (Release / Build) | Integration |
 | --- | --- | --- |
 | Windows | `Fax-Inbox-Setup-….exe` (NSIS) auf [Releases](https://github.com/AniGerm/Inbox/releases) | Startmenü + Desktop; **Auto-Update** |
-| Ubuntu | `Fax-Inbox-….deb` + `.AppImage` auf [Releases](https://github.com/AniGerm/Inbox/releases) | `.deb` → App-Menü; AppImage → portable |
+| Ubuntu | `Fax-Inbox-….deb` + `.AppImage` auf [Releases](https://github.com/AniGerm/Inbox/releases) | `.deb` → App-Menü; AppImage → portable; **Update per Klick** |
 
-> **Hinweis Auto-Update:** Nur der **NSIS-Installer** von GitHub Releases unterstützt Updates (`latest.yml` + `.blockmap`). Portable-Builds und `.deb` aktualisieren sich nicht von selbst über electron-updater.
+> **Auto-Update:** Windows (NSIS) und Ubuntu (`.deb` / AppImage) prüfen GitHub Releases und bieten **Herunterladen → Installieren** in der App. Beim `.deb` erscheint die übliche Passwort-Abfrage (`pkexec`); AppImage ersetzt sich und startet neu.
 
 ## Release veröffentlichen (Maintainer)
 
