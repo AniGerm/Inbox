@@ -85,7 +85,13 @@ function applyUpdateEvent(prev: UpdateUiState, event: UpdateStatusEvent): Update
 }
 
 export default function SettingsPanel({ settings, onSave, onClose }: Props) {
-  const [faxFolder, setFaxFolder] = useState(settings.faxFolder ?? '')
+  const initialFolders =
+    Array.isArray(settings.faxFolders) && settings.faxFolders.length > 0
+      ? settings.faxFolders
+      : settings.faxFolder
+        ? [settings.faxFolder]
+        : ['']
+  const [faxFolders, setFaxFolders] = useState<string[]>(initialFolders)
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     settings.notificationsEnabled,
   )
@@ -165,9 +171,25 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const pick = async () => {
+  const pick = async (index: number) => {
     const chosen = await window.faxInbox.pickFaxFolder()
-    if (chosen) setFaxFolder(chosen)
+    if (!chosen) return
+    setFaxFolders((prev) => {
+      const next = [...prev]
+      next[index] = chosen
+      return next
+    })
+  }
+
+  const addFolder = () => {
+    setFaxFolders((prev) => [...prev, ''])
+  }
+
+  const removeFolder = (index: number) => {
+    setFaxFolders((prev) => {
+      if (prev.length <= 1) return ['']
+      return prev.filter((_, i) => i !== index)
+    })
   }
 
   const save = async () => {
@@ -179,8 +201,10 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
           : printMethod === 'direct'
             ? 'external'
             : printMethod
+      const folders = faxFolders.map((f) => f.trim()).filter(Boolean)
       await onSave({
-        faxFolder: faxFolder.trim() || null,
+        faxFolders: folders,
+        faxFolder: folders[0] ?? null,
         notificationsEnabled,
         autostart,
         autoCheckUpdates,
@@ -237,18 +261,61 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
         {appVersion ? <p className="settings-version">Version {appVersion}</p> : null}
 
         <div className="field">
-          <label htmlFor="fax-folder">Faxordner</label>
-          <div className="path-field">
-            <input
-              id="fax-folder"
-              value={faxFolder}
-              onChange={(e) => setFaxFolder(e.target.value)}
-            />
-            <button type="button" className="btn btn-ghost" onClick={() => void pick()}>
-              …
-            </button>
+          <span className="field-label" id="fax-folders-label">
+            Faxordner
+          </span>
+          <p className="field-hint">
+            Überwachte Ordner für eingehende PDFs (jeder mit eigenem Unterordner Archiv).
+          </p>
+          <div className="folder-list" role="group" aria-labelledby="fax-folders-label">
+            {faxFolders.map((folder, index) => (
+              <div key={index} className="folder-row">
+                <div className="path-field">
+                  <input
+                    id={index === 0 ? 'fax-folder' : `fax-folder-${index}`}
+                    value={folder}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setFaxFolders((prev) => {
+                        const next = [...prev]
+                        next[index] = value
+                        return next
+                      })
+                    }}
+                    placeholder="Pfad zum Faxordner"
+                    aria-label={`Faxordner ${index + 1}`}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => void pick(index)}
+                    title="Ordner wählen"
+                    aria-label="Ordner wählen"
+                  >
+                    …
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost folder-remove"
+                    onClick={() => removeFolder(index)}
+                    disabled={faxFolders.length <= 1 && !folder.trim()}
+                    title="Ordner entfernen"
+                    aria-label="Ordner entfernen"
+                  >
+                    −
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-          <p className="field-hint">Nur PDF-Dateien in diesem Ordner werden überwacht.</p>
+          <button
+            type="button"
+            className="btn btn-ghost folder-add"
+            onClick={addFolder}
+            title="Weiteren Ordner hinzufügen"
+          >
+            + Ordner hinzufügen
+          </button>
         </div>
 
         <div className="field print-settings">

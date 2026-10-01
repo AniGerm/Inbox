@@ -90,7 +90,7 @@ export type WatcherCallbacks = {
 
 export class FaxWatcher {
   private watcher: FSWatcher | null = null
-  private folder: string | null = null
+  private folders: string[] = []
   private items = new Map<string, FaxItem>()
   private callbacks: WatcherCallbacks
   private rescanTimer: ReturnType<typeof setInterval> | null = null
@@ -103,8 +103,13 @@ export class FaxWatcher {
     return normKey(filePath)
   }
 
+  /** Primary folder (first), for backwards-compatible display. */
   getFolder(): string | null {
-    return this.folder
+    return this.folders[0] ?? null
+  }
+
+  getFolders(): string[] {
+    return [...this.folders]
   }
 
   getItems(): FaxItem[] {
@@ -117,43 +122,80 @@ export class FaxWatcher {
     return this.getItems().filter((i) => !i.archived && i.seenAt === null).length
   }
 
-  start(folder: string): void {
+  /** Which watched inbox root owns this file (inbox or its Archiv/). */
+  private findRoot(filePath: string): string | null {
+    const parent = path.dirname(path.resolve(filePath))
+    for (const folder of this.folders) {
+      if (samePath(parent, folder) || samePath(parent, archiveDir(folder))) {
+        return folder
+      }
+    }
+    return null
+  }
+
+  private isWatchedPath(full: string): { folder: string; archived: boolean } | null {
+    const parent = path.dirname(full)
+    for (const folder of this.folders) {
+      if (samePath(parent, folder)) return { folder, archived: false }
+      if (samePath(parent, archiveDir(folder))) return { folder, archived: true }
+    }
+    return null
+  }
+
+  start(folders: string | string[]): void {
     this.stop()
-    const resolvedFolder = path.resolve(folder)
-    this.folder = resolvedFolder
+    const list = (Array.isArray(folders) ? folders : [folders])
+      .map((f) => path.resolve(f.trim()))
+      .filter(Boolean)
+    const seen = new Set<string>()
+    this.folders = []
+    for (const f of list) {
+      const k = this.key(f)
+      if (seen.has(k)) continue
+      seen.add(k)
+      this.folders.push(f)
+    }
     this.items.clear()
 
-    if (!resolvedFolder || !fs.existsSync(resolvedFolder)) {
+    if (this.folders.length === 0) {
       this.emit()
       return
-    }
-
-    const arch = archiveDir(resolvedFolder)
-    if (!fs.existsSync(arch)) {
-      fs.mkdirSync(arch, { recursive: true })
     }
 
     const state = loadInboxState()
     const known = new Map(state.items.map((i) => [this.key(i.path), i]))
 
-    this.scanDirectory(resolvedFolder, false, known)
-    this.scanDirectory(arch, true, known)
+    const watchRoots: string[] = []
+    for (const folder of this.folders) {
+      if (!fs.existsSync(folder)) continue
+      const arch = archiveDir(folder)
+      if (!fs.existsSync(arch)) {
+        fs.mkdirSync(arch, { recursive: true })
+      }
+      this.scanDirectory(folder, false, known)
+      this.scanDirectory(arch, true, known)
+      watchRoots.push(folder, arch)
+    }
 
     this.persist()
     this.emit()
+
+    if (watchRoots.length === 0) return
 
     // Windows (esp. SMB/network fax folders): native fs.watch often misses events.
     // Polling + periodic rescan makes detection reliable like on Linux.
     const usePolling = process.platform === 'win32'
 
-    this.watcher = chokidar.watch([resolvedFolder, arch], {
+    this.watcher = chokidar.watch(watchRoots, {
       ignored: (p: string) => {
         const full = path.resolve(p)
         if (shouldIgnore(full)) return true
-        if (samePath(full, resolvedFolder) || samePath(full, arch)) return false
+        for (const folder of this.folders) {
+          const arch = archiveDir(folder)
+          if (samePath(full, folder) || samePath(full, arch)) return false
+        }
         if (!isPdf(full)) return true
-        const parent = path.dirname(full)
-        return !samePath(parent, resolvedFolder) && !samePath(parent, arch)
+        return this.isWatchedPath(full) === null
       },
       ignoreInitial: true,
       awaitWriteFinish: {
@@ -190,6 +232,7 @@ export class FaxWatcher {
       void this.watcher.close()
       this.watcher = null
     }
+    this.folders = []
   }
 
   markSeen(filePath: string): FaxItem[] {
@@ -248,13 +291,15 @@ export class FaxWatcher {
   }
 
   archive(filePath: string): { items: FaxItem[]; path: string } {
-    if (!this.folder) throw new Error('Kein Faxordner')
     const k = this.key(filePath)
     const item = this.items.get(k)
     if (!item) throw new Error('Eintrag nicht gefunden')
     if (item.archived) return { items: this.getItems(), path: item.path }
 
-    const destDir = archiveDir(this.folder)
+    const root = this.findRoot(item.path)
+    if (!root) throw new Error('Kein Faxordner für diese Datei')
+
+    const destDir = archiveDir(root)
     fs.mkdirSync(destDir, { recursive: true })
     const dest = uniqueTarget(destDir, item.name)
     fs.renameSync(item.path, dest)
@@ -274,13 +319,15 @@ export class FaxWatcher {
   }
 
   restore(filePath: string): { items: FaxItem[]; path: string } {
-    if (!this.folder) throw new Error('Kein Faxordner')
     const k = this.key(filePath)
     const item = this.items.get(k)
     if (!item) throw new Error('Eintrag nicht gefunden')
     if (!item.archived) return { items: this.getItems(), path: item.path }
 
-    const dest = uniqueTarget(this.folder, item.name)
+    const root = this.findRoot(item.path)
+    if (!root) throw new Error('Kein Faxordner für diese Datei')
+
+    const dest = uniqueTarget(root, item.name)
     fs.renameSync(item.path, dest)
 
     this.items.delete(k)
@@ -356,12 +403,13 @@ export class FaxWatcher {
 
   /** Fallback for Windows/network folders when chokidar misses an event. */
   private rescanForNewFiles(): void {
-    if (!this.folder || !fs.existsSync(this.folder)) return
+    if (this.folders.length === 0) return
 
-    const roots: Array<{ dir: string; archived: boolean }> = [
-      { dir: this.folder, archived: false },
-      { dir: archiveDir(this.folder), archived: true },
-    ]
+    const roots: Array<{ dir: string; archived: boolean }> = []
+    for (const folder of this.folders) {
+      roots.push({ dir: folder, archived: false })
+      roots.push({ dir: archiveDir(folder), archived: true })
+    }
 
     let changed = false
     const seenKeys = new Set<string>()
@@ -379,7 +427,6 @@ export class FaxWatcher {
         const k = this.key(full)
         seenKeys.add(k)
         if (this.items.has(k)) {
-          // Keep size fresh
           const meta = fileMeta(full)
           const item = this.items.get(k)!
           if (meta && item.size !== meta.size) {
@@ -407,7 +454,6 @@ export class FaxWatcher {
       }
     }
 
-    // Drop entries whose files vanished (without unlink event)
     for (const [k, item] of [...this.items.entries()]) {
       if (seenKeys.has(k)) continue
       if (!fs.existsSync(item.path)) {
@@ -422,16 +468,13 @@ export class FaxWatcher {
   }
 
   private handleAdd(filePath: string): void {
-    if (!this.folder || !isPdf(filePath) || shouldIgnore(filePath)) return
+    if (this.folders.length === 0 || !isPdf(filePath) || shouldIgnore(filePath)) return
     const full = path.resolve(filePath)
     const k = this.key(full)
     if (this.items.has(k)) return
 
-    const parent = path.dirname(full)
-    const arch = archiveDir(this.folder)
-    const archived = samePath(parent, arch)
-    const inInbox = samePath(parent, this.folder)
-    if (!archived && !inInbox) return
+    const hit = this.isWatchedPath(full)
+    if (!hit) return
 
     const meta = fileMeta(full)
     if (!meta) return
@@ -440,15 +483,15 @@ export class FaxWatcher {
       path: full,
       name: path.basename(full),
       addedAt: new Date().toISOString(),
-      seenAt: archived ? new Date().toISOString() : null,
+      seenAt: hit.archived ? new Date().toISOString() : null,
       size: meta.size,
-      archived,
+      archived: hit.archived,
       printStatus: 'none',
       printedAt: null,
     }
     this.items.set(k, item)
     this.persist()
-    this.emit(archived ? undefined : item)
+    this.emit(hit.archived ? undefined : item)
   }
 
   private handleUnlink(filePath: string): void {

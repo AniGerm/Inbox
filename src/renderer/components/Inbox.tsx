@@ -10,6 +10,7 @@ type Props = {
   items: FaxItem[]
   unreadCount: number
   faxFolder: string
+  faxFolders?: string[]
   focusPath: string | null
   focusNewestToken: number
   onOpenSettings: () => void
@@ -187,6 +188,7 @@ export default function Inbox({
   items,
   unreadCount,
   faxFolder,
+  faxFolders,
   focusPath,
   focusNewestToken,
   onOpenSettings,
@@ -422,7 +424,11 @@ export default function Inbox({
             {visible.length === 0 ? (
               <div className="empty" style={{ paddingTop: 40 }}>
                 <p>{view === 'archive' ? 'Archiv ist leer.' : 'Noch keine Faxe.'}</p>
-                {view === 'inbox' && <p className="path">Überwacht: {faxFolder}</p>}
+                {view === 'inbox' && (
+                  <p className="path" title={(faxFolders ?? [faxFolder]).join('\n')}>
+                    Überwacht: {faxFolder}
+                  </p>
+                )}
               </div>
             ) : (
               groups.map((group) => (

@@ -17,6 +17,7 @@ import {
   focusMainWindow,
 } from './notifications'
 import type { AppSettings, FaxItem } from '../shared/types'
+import { normalizeFaxFolders } from '../shared/types'
 import { initUpdater, setPrintingInProgress } from './updater'
 
 // Linux: Chromium setuid/userns sandbox often aborts before any window on
@@ -194,8 +195,9 @@ function startWatcherFromSettings(): void {
       },
     })
   }
-  if (settings.faxFolder) {
-    watcher.start(settings.faxFolder)
+  const folders = normalizeFaxFolders(settings)
+  if (folders.length > 0) {
+    watcher.start(folders)
   } else {
     watcher.stop()
     broadcastState([], 0)
@@ -331,11 +333,22 @@ function registerIpc(): void {
   ipcMain.handle('save-settings', (_e, partial: Partial<AppSettings>) => {
     const current = loadSettings()
     const next: AppSettings = { ...current, ...partial }
+    // Keep faxFolder / faxFolders in sync when either is updated
+    if (partial.faxFolders !== undefined || partial.faxFolder !== undefined) {
+      const folders = normalizeFaxFolders({
+        faxFolder:
+          partial.faxFolder !== undefined ? partial.faxFolder : next.faxFolder,
+        faxFolders:
+          partial.faxFolders !== undefined ? partial.faxFolders : next.faxFolders,
+      })
+      next.faxFolders = folders
+      next.faxFolder = folders[0] ?? null
+    }
     saveSettings(next)
     if (partial.autostart !== undefined) {
       applyAutostart(next.autostart)
     }
-    if (partial.faxFolder !== undefined) {
+    if (partial.faxFolder !== undefined || partial.faxFolders !== undefined) {
       startWatcherFromSettings()
     }
     return next

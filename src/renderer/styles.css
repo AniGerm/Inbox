@@ -670,9 +670,27 @@ button {
   cursor: not-allowed;
 }
 
-.field-hint {
-  font-size: 12px;
-  color: var(--text-faint);
+.folder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.folder-row .path-field {
+  gap: 6px;
+}
+
+.folder-remove {
+  min-width: 36px;
+  padding-left: 8px;
+  padding-right: 8px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.folder-add {
+  margin-top: 8px;
+  align-self: flex-start;
 }
 
 .field-label {
