@@ -204,17 +204,33 @@ fix_chrome_sandbox() {
   fi
 
   # Ensure menu launches pass --no-sandbox (Chromium reads this before JS).
-  # electron-builder forbids linux.desktop.Exec — patch after install instead.
+  # Desktop Exec is quoted with a space in the path — rewrite to wrapper, do not splice.
   local desktop
   for desktop in /usr/share/applications/fax-inbox.desktop /usr/share/applications/*fax*inbox*.desktop; do
     [[ -f "$desktop" ]] || continue
-    if grep -q '^Exec=' "$desktop" && ! grep -q -- '--no-sandbox' "$desktop"; then
-      run_root sed -i -E 's|^Exec=([^ ]+)( .*)?$|Exec=\1 --no-sandbox\2|' "$desktop" || true
-    fi
+    run_root sed -i 's|^Exec=.*|Exec=fax-inbox %U|' "$desktop" || true
     if [[ -f "$desktop" ]]; then
       ok "Desktop-Eintrag: $(basename "$desktop") → $(grep '^Exec=' "$desktop" || true)"
     fi
   done
+
+  # CLI wrapper
+  local app_bin=""
+  for c in "/opt/Fax Inbox/fax-inbox" "/opt/fax-inbox/fax-inbox" "/opt/Fax-Inbox/fax-inbox"; do
+    if [[ -x "$c" ]]; then
+      app_bin="$c"
+      break
+    fi
+  done
+  if [[ -n "$app_bin" ]]; then
+    run_root tee /usr/bin/fax-inbox >/dev/null <<EOF
+#!/bin/bash
+export ELECTRON_DISABLE_SANDBOX=1
+exec "$app_bin" --no-sandbox "\$@"
+EOF
+    run_root chmod 755 /usr/bin/fax-inbox
+    ok "CLI-Wrapper: /usr/bin/fax-inbox → $app_bin --no-sandbox"
+  fi
 }
 fix_chrome_sandbox
 
