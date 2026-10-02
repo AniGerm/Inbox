@@ -49,9 +49,17 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
   color: inherit;
+}
+
+/* Body uses user-select:none for chrome; inputs must opt back in or typing dies in Electron */
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 button {

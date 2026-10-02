@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 
 type Props = {
   currentName: string
@@ -14,17 +14,39 @@ export default function RenameDialog({ currentName, onCancel, onConfirm }: Props
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    inputRef.current?.focus()
-    inputRef.current?.select()
+    const focusInput = () => {
+      const el = inputRef.current
+      if (!el) return
+      el.focus()
+      el.select()
+    }
+    // Double-rAF: wait until dialog is painted; Electron often steals first focus
+    const id = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(focusInput)
+    })
+    const t = window.setTimeout(focusInput, 50)
+    return () => {
+      window.cancelAnimationFrame(id)
+      window.clearTimeout(t)
+    }
   }, [])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel()
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        onCancel()
+      }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [onCancel])
+
+  const onInputKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    // Keep Inbox global shortcuts from seeing typed characters
+    e.stopPropagation()
+  }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -48,6 +70,7 @@ export default function RenameDialog({ currentName, onCancel, onConfirm }: Props
       <form
         className="settings-panel rename-panel"
         role="dialog"
+        aria-modal="true"
         aria-label="Fax umbenennen"
         onClick={(ev) => ev.stopPropagation()}
         onSubmit={(ev) => void submit(ev)}
@@ -60,7 +83,11 @@ export default function RenameDialog({ currentName, onCancel, onConfirm }: Props
               id="rename-input"
               ref={inputRef}
               value={value}
+              autoFocus
+              autoComplete="off"
+              spellCheck={false}
               onChange={(e) => setValue(e.target.value)}
+              onKeyDown={onInputKeyDown}
               aria-describedby="rename-ext"
             />
             <span id="rename-ext" className="ext-suffix">

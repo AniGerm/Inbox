@@ -317,12 +317,14 @@ export default function Inbox({
   }, [focusPath, items, onConsumedFocusPath, selectItem])
 
   useEffect(() => {
-    if (focusNewestToken > 0) {
-      setView('inbox')
-      const newest = items.find((i) => !i.archived)
-      if (newest) void selectItem(newest)
-    }
-  }, [focusNewestToken, items, selectItem])
+    if (focusNewestToken <= 0) return
+    setView('inbox')
+    const newest = items.find((i) => !i.archived)
+    if (newest) void selectItem(newest)
+    // Only react to tray/focus-newest signals — NOT to every items update
+    // (otherwise markUnseen would immediately get marked seen again).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusNewestToken])
 
   const print = useCallback(async () => {
     if (!selectedVisible) return
@@ -421,9 +423,10 @@ export default function Inbox({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return
       if (renaming) return
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
         e.preventDefault()

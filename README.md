@@ -290,7 +290,8 @@ Häufige Ursachen: fehlendes `libfuse2` (AppImage), Chromium-Sandbox, oder ein u
 5. Einstellungen → **Autostart**: startet die App nach dem Anmelden (Windows und Ubuntu).
 6. **Drucken**: Standard „PDF im Standardprogramm“. Optional „Direkt auf festen Drucker“ unter **Windows und Ubuntu** (Drucker, Duplex, Farbe, Kopien — ohne Dialog; Ubuntu über CUPS/`lp`).
 7. **Export / Kopieren**: Button neben Drucken; in den Einstellungen Zielordner und Button-Namen festlegen (z. B. „T2 med exportieren“).
-8. **Updates** (Windows/Ubuntu): Hinweisbanner bzw. Einstellungen → Updates; kein Neustart ohne Bestätigung.
+8. **Multi-Client-Status**: Einstellungen → Status-Datenbank — gemeinsamer Ordner für gelesen/gedruckt/exportiert (`inbox-state.json`), damit alle Clients synchron bleiben.
+9. **Updates** (Windows/Ubuntu): Hinweisbanner bzw. Einstellungen → Updates; kein Neustart ohne Bestätigung.
 
 ## Nicht im MVP
 

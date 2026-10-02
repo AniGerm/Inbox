@@ -12,7 +12,7 @@ import fs from 'node:fs'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { FaxWatcher } from './watcher'
-import { loadSettings, saveSettings } from './store'
+import { loadSettings, saveSettings, migrateLocalStateToSharedIfNeeded } from './store'
 import {
   showNewFaxNotification,
   loadTrayIconFromFile,
@@ -491,7 +491,14 @@ function registerIpc(): void {
     if (partial.autostart !== undefined) {
       applyAutostart(next.autostart)
     }
-    if (partial.faxFolder !== undefined || partial.faxFolders !== undefined) {
+    if (partial.stateFolder !== undefined) {
+      migrateLocalStateToSharedIfNeeded(next.stateFolder)
+    }
+    if (
+      partial.faxFolder !== undefined ||
+      partial.faxFolders !== undefined ||
+      partial.stateFolder !== undefined
+    ) {
       startWatcherFromSettings()
     }
     return next
@@ -509,6 +516,15 @@ function registerIpc(): void {
   ipcMain.handle('pick-export-folder', async () => {
     const result = await dialog.showOpenDialog(mainWindow!, {
       title: 'Exportordner wählen',
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle('pick-state-folder', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      title: 'Status-/Datenbankordner wählen (geteilt für alle Clients)',
       properties: ['openDirectory', 'createDirectory'],
     })
     if (result.canceled || result.filePaths.length === 0) return null

@@ -11,13 +11,13 @@ import {
 } from '../shared/types'
 
 const SETTINGS_FILE = 'settings.json'
-const STATE_FILE = 'inbox-state.json'
+export const STATE_FILE = 'inbox-state.json'
 
 function userDataPath(filename: string): string {
   return path.join(app.getPath('userData'), filename)
 }
 
-function readJson<T>(file: string, fallback: T): T {
+function readJsonFile<T>(file: string, fallback: T): T {
   try {
     if (!fs.existsSync(file)) return fallback
     const raw = fs.readFileSync(file, 'utf8')
@@ -34,7 +34,6 @@ function writeJson(file: string, data: unknown): void {
 
 function normalizePrintMethod(value: unknown): PrintMethod {
   if (value === 'direct') return 'direct'
-  // legacy 'system' (Electron dialog) → external
   return 'external'
 }
 
@@ -49,8 +48,13 @@ function normalizeCopies(value: unknown): number {
   return Math.min(99, Math.max(1, Math.round(n)))
 }
 
+function normalizeOptionalFolder(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+/** Settings always live in local userData (per machine). */
 export function loadSettings(): AppSettings {
-  const raw = readJson(userDataPath(SETTINGS_FILE), { ...DEFAULT_SETTINGS })
+  const raw = readJsonFile(userDataPath(SETTINGS_FILE), { ...DEFAULT_SETTINGS })
   const folders = normalizeFaxFolders({
     faxFolder: typeof raw.faxFolder === 'string' ? raw.faxFolder : null,
     faxFolders: Array.isArray(raw.faxFolders) ? raw.faxFolders : [],
@@ -73,14 +77,12 @@ export function loadSettings(): AppSettings {
       typeof raw.autoCheckUpdates === 'boolean'
         ? raw.autoCheckUpdates
         : DEFAULT_SETTINGS.autoCheckUpdates,
-    exportFolder:
-      typeof raw.exportFolder === 'string' && raw.exportFolder.trim()
-        ? raw.exportFolder.trim()
-        : null,
+    exportFolder: normalizeOptionalFolder(raw.exportFolder),
     exportButtonLabel:
       typeof raw.exportButtonLabel === 'string' && raw.exportButtonLabel.trim()
         ? raw.exportButtonLabel.trim()
         : DEFAULT_SETTINGS.exportButtonLabel,
+    stateFolder: normalizeOptionalFolder(raw.stateFolder),
   }
 }
 
@@ -90,13 +92,55 @@ export function saveSettings(settings: AppSettings): void {
     ...settings,
     faxFolders: folders,
     faxFolder: folders[0] ?? null,
+    stateFolder: normalizeOptionalFolder(settings.stateFolder),
   })
 }
 
+/**
+ * Path to inbox-state.json — shared folder when configured, else local userData.
+ * Reads settings.json directly to avoid recursion.
+ */
+export function getInboxStatePath(): string {
+  try {
+    const settingsFile = userDataPath(SETTINGS_FILE)
+    if (fs.existsSync(settingsFile)) {
+      const raw = JSON.parse(fs.readFileSync(settingsFile, 'utf8')) as {
+        stateFolder?: unknown
+      }
+      const folder = normalizeOptionalFolder(raw.stateFolder)
+      if (folder) {
+        return path.join(folder, STATE_FILE)
+      }
+    }
+  } catch {
+    /* fall through to local */
+  }
+  return userDataPath(STATE_FILE)
+}
+
 export function loadInboxState(): InboxStateFile {
-  return readJson(userDataPath(STATE_FILE), { items: [] })
+  return readJsonFile(getInboxStatePath(), { items: [] })
 }
 
 export function saveInboxState(state: InboxStateFile): void {
-  writeJson(userDataPath(STATE_FILE), state)
+  writeJson(getInboxStatePath(), state)
+}
+
+/**
+ * If a shared state folder is newly configured and has no inbox-state.json yet,
+ * seed it from the local userData copy so markers are not lost.
+ */
+export function migrateLocalStateToSharedIfNeeded(stateFolder: string | null): void {
+  const folder = typeof stateFolder === 'string' ? stateFolder.trim() : ''
+  if (!folder) return
+  try {
+    fs.mkdirSync(folder, { recursive: true })
+    const shared = path.join(folder, STATE_FILE)
+    if (fs.existsSync(shared)) return
+    const local = userDataPath(STATE_FILE)
+    if (!fs.existsSync(local)) return
+    fs.copyFileSync(local, shared)
+  } catch (err) {
+    console.error('Status-Migration fehlgeschlagen:', err)
+  }
 }

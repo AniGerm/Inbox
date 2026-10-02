@@ -48,8 +48,11 @@ export interface AppSettings {
   exportFolder: string | null
   /** Custom label for the export button (e.g. "T2 med exportieren") */
   exportButtonLabel: string
-  // Scan folder reserved for a later release — not used in MVP.
-  // scanFolder: string | null
+  /**
+   * Shared folder for inbox-state.json (read/print/export markers).
+   * All clients that point here stay in sync. null = local userData only.
+   */
+  stateFolder: string | null
 }
 
 /** Events forwarded from electron-updater to the renderer */
@@ -89,6 +92,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoCheckUpdates: true,
   exportFolder: null,
   exportButtonLabel: 'In Ordner kopieren',
+  stateFolder: null,
 }
 
 /** Unique non-empty folder list; prefer faxFolders, fall back to legacy faxFolder. */

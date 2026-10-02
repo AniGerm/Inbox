@@ -113,6 +113,7 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
       ? settings.exportButtonLabel
       : 'In Ordner kopieren',
   )
+  const [stateFolder, setStateFolder] = useState(settings.stateFolder ?? '')
   const [printMethod, setPrintMethod] = useState<PrintMethod>(
     settings.printMethod === 'direct' ? 'direct' : 'external',
   )
@@ -202,6 +203,13 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
     setExportFolder(chosen)
   }
 
+  const pickState = async () => {
+    if (typeof window.faxInbox.pickStateFolder !== 'function') return
+    const chosen = await window.faxInbox.pickStateFolder()
+    if (!chosen) return
+    setStateFolder(chosen)
+  }
+
   const addFolder = () => {
     setFaxFolders((prev) => [...prev, ''])
   }
@@ -233,6 +241,7 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
         autoCheckUpdates,
         exportFolder: exportFolder.trim() || null,
         exportButtonLabel: exportButtonLabel.trim() || 'In Ordner kopieren',
+        stateFolder: stateFolder.trim() || null,
         printMethod: method,
         printerName: printerName.trim(),
         duplex,
@@ -345,6 +354,35 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
           >
             + Ordner hinzufügen
           </button>
+        </div>
+
+        <div className="field">
+          <span className="field-label" id="state-folder-label">
+            Status-Datenbank (Multi-Client)
+          </span>
+          <p className="field-hint">
+            Gemeinsamer Ordner für <strong>gelesen / gedruckt / exportiert</strong> (Datei{' '}
+            <code>inbox-state.json</code>). Alle PCs wählen denselben Netzwerkordner — dann sind
+            Marker und Uhrzeiten überall synchron. Leer = nur lokal auf diesem PC.
+          </p>
+          <div className="path-field">
+            <input
+              id="state-folder"
+              value={stateFolder}
+              onChange={(e) => setStateFolder(e.target.value)}
+              placeholder="z. B. \\Server\FaxInbox-Status oder /mnt/share/fax-status"
+              aria-labelledby="state-folder-label"
+            />
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => void pickState()}
+              title="Ordner wählen"
+              aria-label="Statusordner wählen"
+            >
+              …
+            </button>
+          </div>
         </div>
 
         <div className="field">
