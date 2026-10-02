@@ -22,6 +22,7 @@ const api = {
     ipcRenderer.invoke('save-settings', partial),
   pickFaxFolder: (): Promise<string | null> => ipcRenderer.invoke('pick-fax-folder'),
   pickExportFolder: (): Promise<string | null> => ipcRenderer.invoke('pick-export-folder'),
+  pickStateFolder: (): Promise<string | null> => ipcRenderer.invoke('pick-state-folder'),
   exportFax: (
     filePath: string,
   ): Promise<{ ok: true; dest: string; items: FaxItem[] }> =>

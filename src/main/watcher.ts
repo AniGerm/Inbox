@@ -1,7 +1,7 @@
 import chokidar, { type FSWatcher } from 'chokidar'
 import fs from 'node:fs'
 import path from 'node:path'
-import { loadInboxState, saveInboxState } from './store'
+import { loadInboxState, saveInboxState, getInboxStatePath } from './store'
 import { ARCHIVE_DIR_NAME, type ExportStatus, type FaxItem, type PrintStatus } from '../shared/types'
 
 type KnownItem = {
@@ -109,6 +109,9 @@ export class FaxWatcher {
   private items = new Map<string, FaxItem>()
   private callbacks: WatcherCallbacks
   private rescanTimer: ReturnType<typeof setInterval> | null = null
+  private stateSyncTimer: ReturnType<typeof setInterval> | null = null
+  private lastStateMtimeMs = 0
+  private writingState = false
 
   constructor(callbacks: WatcherCallbacks) {
     this.callbacks = callbacks
@@ -236,12 +239,22 @@ export class FaxWatcher {
         this.rescanForNewFiles()
       }, 2500)
     }
+
+    // Multi-client: pick up read/print/export markers from shared inbox-state.json
+    this.stateSyncTimer = setInterval(() => {
+      this.reloadSharedStateIfChanged()
+    }, 2000)
+    this.touchStateMtime()
   }
 
   stop(): void {
     if (this.rescanTimer) {
       clearInterval(this.rescanTimer)
       this.rescanTimer = null
+    }
+    if (this.stateSyncTimer) {
+      clearInterval(this.stateSyncTimer)
+      this.stateSyncTimer = null
     }
     if (this.watcher) {
       void this.watcher.close()
@@ -540,29 +553,107 @@ export class FaxWatcher {
   }
 
   private persist(): void {
-    saveInboxState({
-      items: this.getItems().map(
-        ({
-          path: p,
-          addedAt,
-          seenAt,
-          archived,
-          printStatus,
-          printedAt,
-          exportStatus,
-          exportedAt,
-        }) => ({
-          path: p,
-          addedAt,
-          seenAt,
-          archived,
-          printStatus,
-          printedAt,
-          exportStatus,
-          exportedAt,
-        }),
-      ),
-    })
+    this.writingState = true
+    try {
+      saveInboxState({
+        items: this.getItems().map(
+          ({
+            path: p,
+            addedAt,
+            seenAt,
+            archived,
+            printStatus,
+            printedAt,
+            exportStatus,
+            exportedAt,
+          }) => ({
+            path: p,
+            addedAt,
+            seenAt,
+            archived,
+            printStatus,
+            printedAt,
+            exportStatus,
+            exportedAt,
+          }),
+        ),
+      })
+      this.touchStateMtime()
+    } finally {
+      // Brief grace so our own write does not bounce back as "external"
+      setTimeout(() => {
+        this.writingState = false
+      }, 250)
+    }
+  }
+
+  private touchStateMtime(): void {
+    try {
+      const p = getInboxStatePath()
+      if (fs.existsSync(p)) {
+        this.lastStateMtimeMs = fs.statSync(p).mtimeMs
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /**
+   * Apply metadata from a shared inbox-state.json written by another client
+   * (seen / print / export). Last writer wins via file mtime.
+   */
+  private reloadSharedStateIfChanged(): void {
+    if (this.writingState) return
+    try {
+      const p = getInboxStatePath()
+      if (!fs.existsSync(p)) return
+      const mtime = fs.statSync(p).mtimeMs
+      if (mtime <= this.lastStateMtimeMs) return
+      this.lastStateMtimeMs = mtime
+
+      const state = loadInboxState()
+      let changed = false
+      for (const known of state.items) {
+        const item = this.items.get(this.key(known.path))
+        if (!item) continue
+
+        const nextSeen = known.seenAt ?? null
+        if (item.seenAt !== nextSeen) {
+          item.seenAt = nextSeen
+          changed = true
+        }
+
+        const printFields = printFieldsFromKnown(known)
+        if (
+          item.printStatus !== printFields.printStatus ||
+          item.printedAt !== printFields.printedAt
+        ) {
+          item.printStatus = printFields.printStatus
+          item.printedAt = printFields.printedAt
+          changed = true
+        }
+
+        const exportFields = exportFieldsFromKnown(known)
+        if (
+          item.exportStatus !== exportFields.exportStatus ||
+          item.exportedAt !== exportFields.exportedAt
+        ) {
+          item.exportStatus = exportFields.exportStatus
+          item.exportedAt = exportFields.exportedAt
+          changed = true
+        }
+
+        if (typeof known.archived === 'boolean' && item.archived !== known.archived) {
+          // Do not flip archived from remote metadata alone — archive is a file move.
+        }
+      }
+
+      if (changed) {
+        this.emit()
+      }
+    } catch (err) {
+      console.error('Shared-State Sync fehlgeschlagen:', err)
+    }
   }
 
   private emit(newlyAdded?: FaxItem): void {
