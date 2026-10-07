@@ -679,8 +679,8 @@ button {
 }
 
 .settings-panel {
-  width: min(600px, calc(100% - 32px));
-  max-height: min(92vh, 820px);
+  width: min(760px, calc(100% - 32px));
+  max-height: min(92vh, 860px);
   overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -688,6 +688,10 @@ button {
   padding: 24px 28px 22px;
   box-shadow: 0 16px 40px rgba(28, 27, 25, 0.12);
   animation: slide-in 200ms ease;
+}
+
+.settings-panel.rename-panel {
+  width: min(480px, calc(100% - 32px));
 }
 
 .settings-panel h2 {
