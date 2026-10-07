@@ -1,11 +1,11 @@
 {
   "name": "fax-inbox",
-  "version": "0.3.21",
-  "description": "Fax Inbox – Desktop-Inbox für eingehende Fax-PDFs",
+  "version": "0.4.0",
+  "description": "Inbox – Desktop-Inbox für eingehende PDFs (Fax, Scans, Anhänge)",
   "main": "dist-electron/main.js",
   "homepage": "https://github.com/AniGerm/Inbox",
   "author": {
-    "name": "Fax Inbox",
+    "name": "Inbox",
     "email": "fax-inbox@users.noreply.github.com"
   },
   "license": "MIT",
@@ -46,8 +46,8 @@
   },
   "build": {
     "appId": "com.faxinbox.app",
-    "productName": "Fax Inbox",
-    "copyright": "Copyright © Fax Inbox",
+    "productName": "Inbox",
+    "copyright": "Copyright © Inbox",
     "directories": {
       "output": "release",
       "buildResources": "resources"
@@ -70,7 +70,7 @@
         "nsis"
       ],
       "icon": "resources/icon.ico",
-      "artifactName": "Fax-Inbox-Setup-${version}.${ext}",
+      "artifactName": "Inbox-Setup-${version}.${ext}",
       "signAndEditExecutable": false
     },
     "nsis": {
@@ -79,9 +79,9 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Fax Inbox",
+      "shortcutName": "Inbox",
       "runAfterFinish": true,
-      "uninstallDisplayName": "Fax Inbox",
+      "uninstallDisplayName": "Inbox",
       "deleteAppDataOnUninstall": false,
       "installerIcon": "resources/icon.ico",
       "uninstallerIcon": "resources/icon.ico",
@@ -98,24 +98,24 @@
       "executableArgs": [
         "--no-sandbox"
       ],
-      "synopsis": "Desktop-Inbox für eingehende Fax-PDFs",
-      "description": "Überwacht den Faxordner, zeigt neue PDFs mit Badge und Benachrichtigung, Vorschau, Drucken und Archiv.",
+      "synopsis": "Desktop-Inbox für eingehende PDFs",
+      "description": "Überwacht Eingangsordner, zeigt neue PDFs mit Badge und Benachrichtigung, Vorschau, Drucken und Archiv.",
       "desktop": {
-        "Name": "Fax Inbox",
-        "GenericName": "Fax Inbox",
-        "Comment": "Inbox für eingehende Fax-PDFs",
+        "Name": "Inbox",
+        "GenericName": "Inbox",
+        "Comment": "Inbox für eingehende PDFs",
         "Categories": "Office;Utility;",
-        "Keywords": "fax;pdf;inbox;ricoh;",
+        "Keywords": "inbox;pdf;scan;fax;anhang;",
         "StartupWMClass": "fax-inbox",
         "Terminal": "false",
         "Type": "Application"
       },
-      "artifactName": "Fax-Inbox-${version}.${ext}"
+      "artifactName": "Inbox-${version}.${ext}"
     },
     "deb": {
       "packageCategory": "office",
       "priority": "optional",
-      "maintainer": "Fax Inbox <fax-inbox@users.noreply.github.com>",
+      "maintainer": "Inbox <fax-inbox@users.noreply.github.com>",
       "depends": [
         "libgtk-3-0",
         "libnotify4",
@@ -132,7 +132,7 @@
       "afterInstall": "build/linux/after-install.sh"
     },
     "appImage": {
-      "artifactName": "Fax-Inbox-${version}.AppImage"
+      "artifactName": "Inbox-${version}.AppImage"
     },
     "asarUnpack": [
       "node_modules/pdf-to-printer/**"

@@ -221,7 +221,7 @@ export default function App() {
           <div className="update-restart-card">
             <h2>Update wird installiert</h2>
             <p>
-              Fax Inbox wird jetzt beendet. Unter Linux erscheint ggf. die Passwort-Abfrage
+              Inbox wird jetzt beendet. Unter Linux erscheint ggf. die Passwort-Abfrage
               zur Installation — bitte bestätigen. Die App startet danach automatisch neu.
             </p>
             <div className="update-restart-spinner" aria-hidden />

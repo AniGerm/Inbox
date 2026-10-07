@@ -52,8 +52,8 @@ jobs:
         with:
           name: windows-release
           path: |
-            release/Fax-Inbox-Setup-*.exe
-            release/Fax-Inbox-Setup-*.exe.blockmap
+            release/Inbox-Setup-*.exe
+            release/Inbox-Setup-*.exe.blockmap
             release/latest.yml
           if-no-files-found: error
 
@@ -90,8 +90,8 @@ jobs:
         with:
           name: linux-release
           path: |
-            release/Fax-Inbox-*.deb
-            release/Fax-Inbox-*.AppImage
+            release/Inbox-*.deb
+            release/Inbox-*.AppImage
             release/latest-linux.yml
           if-no-files-found: error
 

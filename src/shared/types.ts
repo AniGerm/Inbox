@@ -23,6 +23,12 @@ export interface FaxItem {
   assignedTo: string | null
   /** ISO timestamp of last assignment; null if never assigned */
   assignedAt: string | null
+  /** High-priority flag (synced) */
+  priority: boolean
+  /** Free-text sticky note; null/empty = none */
+  note: string | null
+  /** Free-form tags */
+  tags: string[]
 }
 
 export type PrintMethod = 'external' | 'direct'
@@ -36,7 +42,7 @@ export interface PrinterInfo {
 export interface AppSettings {
   /** Primary / first watched folder (legacy + convenience) */
   faxFolder: string | null
-  /** All watched fax folders (PDFs only, each with own Archiv/) */
+  /** All watched inbox folders (PDFs only, each with own Archiv/) */
   faxFolders: string[]
   notificationsEnabled: boolean
   autostart: boolean
@@ -64,6 +70,10 @@ export interface AppSettings {
   appMode: AppMode
   /** When appMode is recipient: which shared user this client represents */
   clientUserName: string | null
+  /** Move old seen documents into Archiv automatically */
+  autoArchiveEnabled: boolean
+  /** Age in days since addedAt before auto-archive (seen items only) */
+  autoArchiveAfterDays: number
 }
 
 /** Events forwarded from electron-updater to the renderer */
@@ -90,6 +100,9 @@ export interface InboxStateFile {
     exportedAt?: string | null
     assignedTo?: string | null
     assignedAt?: string | null
+    priority?: boolean
+    note?: string | null
+    tags?: string[]
   }>
 }
 
@@ -110,6 +123,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   stateFolder: null,
   appMode: 'reception',
   clientUserName: null,
+  autoArchiveEnabled: false,
+  autoArchiveAfterDays: 30,
 }
 
 export function normalizeAppMode(value: unknown): AppMode {
@@ -135,6 +150,35 @@ export function normalizeUsers(value: unknown): string[] {
     out.push(name)
   }
   return out
+}
+
+/** Unique non-empty trimmed tags, stable order (case-insensitive). */
+export function normalizeTags(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const entry of value) {
+    if (typeof entry !== 'string') continue
+    const tag = entry.trim()
+    if (!tag) continue
+    const key = tag.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(tag)
+  }
+  return out
+}
+
+export function normalizeNote(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed ? trimmed : null
+}
+
+export function normalizeAutoArchiveDays(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return DEFAULT_SETTINGS.autoArchiveAfterDays
+  return Math.min(365, Math.max(1, Math.round(n)))
 }
 
 /** Unique non-empty folder list; prefer faxFolders, fall back to legacy faxFolder. */

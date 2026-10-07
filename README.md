@@ -1,6 +1,6 @@
-# Fax Inbox
+# Inbox
 
-Desktop-Inbox für eingehende Fax-PDFs (z. B. Ricoh IM350F).
+Desktop-Inbox für eingehende PDFs — Fax, Scans, Anhänge (z. B. Ricoh IM350F).
 
 **Plattformen:** Windows und Ubuntu · **Stack:** Electron + Vite + React + TypeScript · **Format:** nur PDF
 
@@ -13,10 +13,10 @@ Fertige Installer liegen als **GitHub Releases** bereit — **kein Node.js, kein
 ### Windows (einfach)
 
 1. Auf der [Releases-Seite](https://github.com/AniGerm/Inbox/releases) die neueste Version öffnen.
-2. Unter **Assets** die Datei **`Fax-Inbox-Setup-….exe`** herunterladen (NSIS-Installer).
+2. Unter **Assets** die Datei **`Inbox-Setup-….exe`** herunterladen (NSIS-Installer).
 3. Die `.exe` starten und den Assistenten durchklicken: **Weiter → Installieren → Fertig**.
-4. Startmenü → **„Fax Inbox“**  
-   Typischer Pfad: `%LOCALAPPDATA%\Programs\fax-inbox\Fax Inbox.exe`
+4. Startmenü → **„Inbox“**  
+   Typischer Pfad: `%LOCALAPPDATA%\Programs\fax-inbox\Inbox.exe`
 
 Danach aktualisiert sich die App bei neueren Releases selbst (Hinweis in der App / unter Einstellungen → Updates).  
 **Nicht** die portable `.exe` für den Dauerbetrieb nutzen — Auto-Update funktioniert nur mit dem **Setup-Installer**.
@@ -24,18 +24,18 @@ Danach aktualisiert sich die App bei neueren Releases selbst (Hinweis in der App
 ### Ubuntu (einfach)
 
 1. Auf der [Releases-Seite](https://github.com/AniGerm/Inbox/releases) die neueste Version öffnen.
-2. Unter **Assets** die Datei **`Fax-Inbox-….deb`** herunterladen.
+2. Unter **Assets** die Datei **`Inbox-….deb`** herunterladen.
 3. Installieren:
 
 ```bash
-sudo apt install ./Fax-Inbox-*.deb
+sudo apt install ./Inbox-*.deb
 # oder:
-sudo dpkg -i Fax-Inbox-*.deb
+sudo dpkg -i Inbox-*.deb
 ```
 
-4. Im Anwendungsmenü **Fax Inbox** starten — oder `fax-inbox` im Terminal.
+4. Im Anwendungsmenü **Inbox** starten — oder `fax-inbox` im Terminal.
 
-Optional portable: **`Fax-Inbox-….AppImage`** herunterladen, `chmod +x` und starten.
+Optional portable: **`Inbox-….AppImage`** herunterladen, `chmod +x` und starten.
 ---
 
 ## Installation aus dem Quellcode (optional)
@@ -57,16 +57,16 @@ Das Skript:
 1. installiert Node.js 22 falls fehlend (NodeSource, benötigt `sudo`)
 2. installiert Electron-Systempakete falls nötig
 3. baut **AppImage** + **`.deb`**
-4. installiert das **`.deb` systemweit** → **„Fax Inbox“** im Anwendungsmenü (Büro/Office)
+4. installiert das **`.deb` systemweit** → **„Inbox“** im Anwendungsmenü (Büro/Office)
 5. kopiert das **AppImage** nach `~/Applications/`
 6. startet die App
 
-Danach im Menü **Fax Inbox** suchen — oder:
+Danach im Menü **Inbox** suchen — oder:
 
 ```bash
 fax-inbox
 # bzw. portable:
-~/Applications/Fax-Inbox-*.AppImage
+~/Applications/Inbox-*.AppImage
 ```
 
 ### Windows — selbst bauen
@@ -143,8 +143,8 @@ Das Skript:
 4. startet den **Setup-Assistenten**
 
 Im Assistenten: **Weiter → Installieren → Fertig** durchklicken.  
-Danach Startmenü → **„Fax Inbox“**  
-Installationspfad typisch: `%LOCALAPPDATA%\Programs\fax-inbox\Fax Inbox.exe`
+Danach Startmenü → **„Inbox“**  
+Installationspfad typisch: `%LOCALAPPDATA%\Programs\fax-inbox\Inbox.exe`
 
 ---
 
@@ -152,8 +152,8 @@ Installationspfad typisch: `%LOCALAPPDATA%\Programs\fax-inbox\Fax Inbox.exe`
 
 | OS | Artefakte (Release / Build) | Integration |
 | --- | --- | --- |
-| Windows | `Fax-Inbox-Setup-….exe` (NSIS) auf [Releases](https://github.com/AniGerm/Inbox/releases) | Startmenü + Desktop; **Auto-Update** |
-| Ubuntu | `Fax-Inbox-….deb` + `.AppImage` auf [Releases](https://github.com/AniGerm/Inbox/releases) | `.deb` → App-Menü; AppImage → portable; **Update per Klick** |
+| Windows | `Inbox-Setup-….exe` (NSIS) auf [Releases](https://github.com/AniGerm/Inbox/releases) | Startmenü + Desktop; **Auto-Update** |
+| Ubuntu | `Inbox-….deb` + `.AppImage` auf [Releases](https://github.com/AniGerm/Inbox/releases) | `.deb` → App-Menü; AppImage → portable; **Update per Klick** |
 
 > **Auto-Update:** Windows (NSIS) und Ubuntu (`.deb` / AppImage) prüfen GitHub Releases und bieten **Herunterladen → Installieren** in der App. Beim `.deb` erscheint die übliche Passwort-Abfrage (`pkexec`); AppImage ersetzt sich und startet neu.
 
@@ -173,8 +173,8 @@ git push origin v0.3.0
 
 Die Action `.github/workflows/release.yml` baut parallel Windows und Ubuntu, sammelt die Artefakte und veröffentlicht sie **gemeinsam** am Tag (vermeidet Race Conditions zwischen den Jobs):
 
-- **Windows:** NSIS-Setup (`Fax-Inbox-Setup-….exe`, `latest.yml`, `.blockmap`)
-- **Ubuntu:** `.deb` + `.AppImage` (`Fax-Inbox-….deb`, `Fax-Inbox-….AppImage`)
+- **Windows:** NSIS-Setup (`Inbox-Setup-….exe`, `latest.yml`, `.blockmap`)
+- **Ubuntu:** `.deb` + `.AppImage` (`Inbox-….deb`, `Inbox-….AppImage`)
 
 Alternativ lokal bauen und manuell hochladen:
 
@@ -200,7 +200,7 @@ Die installierte App prüft beim Start (nach ~10 s) und alle 4 Stunden auf U
 
 ### Nach einem Update: Alte Version läuft noch
 
-Wenn nach `sudo apt install ./Fax-Inbox-*.deb` weiterhin die alte UI erscheint
+Wenn nach `sudo apt install ./Inbox-*.deb` weiterhin die alte UI erscheint
 (fehlende Menüeinträge, alte Versionsnummer in den Einstellungen), läuft die
 vorherige Instanz noch im Hintergrund. Electron erlaubt nur eine Instanz pro
 User; die neu installierte Binary beendet sich in dem Fall sofort selbst.
@@ -251,7 +251,7 @@ Ab **0.3.7** macht der `.deb`-Installer das automatisch (früherer sed-Patch zer
 ```bash
 fax-inbox --no-sandbox
 # oder
-ELECTRON_DISABLE_SANDBOX=1 ~/Applications/Fax-Inbox-*.AppImage --no-sandbox
+ELECTRON_DISABLE_SANDBOX=1 ~/Applications/Inbox-*.AppImage --no-sandbox
 ```
 
 2. Log vom Installer/Start prüfen:

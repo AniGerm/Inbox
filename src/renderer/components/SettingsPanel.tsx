@@ -123,6 +123,12 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
   const [newUserName, setNewUserName] = useState('')
   const [usersBusy, setUsersBusy] = useState(false)
   const [usersError, setUsersError] = useState<string | null>(null)
+  const [autoArchiveEnabled, setAutoArchiveEnabled] = useState(
+    settings.autoArchiveEnabled === true,
+  )
+  const [autoArchiveAfterDays, setAutoArchiveAfterDays] = useState(
+    settings.autoArchiveAfterDays ?? 30,
+  )
   const [printMethod, setPrintMethod] = useState<PrintMethod>(
     settings.printMethod === 'direct' ? 'direct' : 'external',
   )
@@ -310,6 +316,11 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
         appMode,
         clientUserName:
           appMode === 'recipient' ? clientUserName.trim() || null : clientUserName.trim() || null,
+        autoArchiveEnabled,
+        autoArchiveAfterDays: Math.min(
+          365,
+          Math.max(1, Math.round(Number(autoArchiveAfterDays)) || 30),
+        ),
         printMethod: method,
         printerName: printerName.trim(),
         duplex,
@@ -368,10 +379,11 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
 
         <div className="field">
           <span className="field-label" id="fax-folders-label">
-            Faxordner
+            Eingangsordner
           </span>
           <p className="field-hint">
-            Überwachte Ordner für eingehende PDFs (jeder mit eigenem Unterordner Archiv).
+            Überwachte Ordner für eingehende PDFs — Fax, Scans, Anhänge (jeder mit eigenem Unterordner
+            Archiv).
           </p>
           <div className="folder-list" role="group" aria-labelledby="fax-folders-label">
             {faxFolders.map((folder, index) => (
@@ -388,8 +400,8 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
                         return next
                       })
                     }}
-                    placeholder="Pfad zum Faxordner"
-                    aria-label={`Faxordner ${index + 1}`}
+                    placeholder="Pfad zum Eingangsordner"
+                    aria-label={`Eingangsordner ${index + 1}`}
                   />
                   <button
                     type="button"
@@ -458,7 +470,7 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
             App-Modus
           </span>
           <p className="field-hint">
-            <strong>Empfang</strong> sieht alle Faxe und weist Nutzer zu.{' '}
+            <strong>Empfang</strong> sieht alle Dokumente und weist Nutzer zu.{' '}
             <strong>Empfänger</strong> sieht nur die ihm zugewiesenen Dokumente.
           </p>
           <div className="radio-group" role="radiogroup" aria-labelledby="app-mode-label">
@@ -511,7 +523,7 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
             Benutzer für Zuordnung
           </span>
           <p className="field-hint">
-            Zentrale Liste in der Status-Datei. Am Empfang werden Faxe diesen Namen zugewiesen.
+            Zentrale Liste in der Status-Datei. Am Empfang werden Dokumente diesen Namen zugewiesen.
           </p>
           <div className="user-add-row">
             <input
@@ -564,11 +576,42 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
         </div>
 
         <div className="field">
+          <span className="field-label" id="auto-archive-label">
+            Auto-Archiv
+          </span>
+          <p className="field-hint">
+            Gelesene Dokumente, die älter als die gewählte Anzahl Tage sind, werden automatisch in
+            den Archiv-Ordner verschoben (beim Start und alle 5 Minuten).
+          </p>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={autoArchiveEnabled}
+              onChange={(e) => setAutoArchiveEnabled(e.target.checked)}
+              aria-labelledby="auto-archive-label"
+            />
+            <span>Auto-Archiv aktiv</span>
+          </label>
+          <label htmlFor="auto-archive-days" style={{ marginTop: 10 }}>
+            Nach Tagen (gelesen)
+          </label>
+          <input
+            id="auto-archive-days"
+            type="number"
+            min={1}
+            max={365}
+            value={autoArchiveAfterDays}
+            disabled={!autoArchiveEnabled}
+            onChange={(e) => setAutoArchiveAfterDays(Number(e.target.value))}
+          />
+        </div>
+
+        <div className="field">
           <span className="field-label" id="export-folder-label">
             Export / Kopieren
           </span>
           <p className="field-hint">
-            Zusätzlicher Button neben <strong>Drucken</strong>: kopiert das gewählte Fax dauerhaft
+            Zusätzlicher Button neben <strong>Drucken</strong>: kopiert das gewählte Dokument dauerhaft
             in einen Ordner deiner Wahl (z. B. T2 med, Dokumente, …). Name des Buttons ist frei
             wählbar.
           </p>

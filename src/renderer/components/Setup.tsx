@@ -19,7 +19,7 @@ export default function Setup({ onComplete }: Props) {
 
   const start = async () => {
     if (!path.trim()) {
-      setError('Bitte einen Faxordner wählen.')
+      setError('Bitte einen Eingangsordner wählen.')
       return
     }
     setBusy(true)
@@ -35,14 +35,14 @@ export default function Setup({ onComplete }: Props) {
   return (
     <div className="setup">
       <div className="setup-card">
-        <h1>Fax Inbox</h1>
-        <p>Wähle den Ordner, in dem eingehende Fax-PDFs abgelegt werden.</p>
+        <h1>Inbox</h1>
+        <p>Wähle den Ordner, in dem eingehende PDFs abgelegt werden (Fax, Scans, Anhänge).</p>
         <div className="path-field">
           <input
             value={path}
             onChange={(e) => setPath(e.target.value)}
-            placeholder="Pfad zum Faxordner"
-            aria-label="Faxordner"
+            placeholder="Pfad zum Eingangsordner"
+            aria-label="Eingangsordner"
           />
           <button type="button" className="btn btn-ghost" onClick={() => void pick()}>
             Durchsuchen

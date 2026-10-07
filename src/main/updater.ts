@@ -181,7 +181,7 @@ async function runInstallUpdate(): Promise<{ ok: boolean; reason?: string }> {
       await dialog.showMessageBox(win, {
         type: 'info',
         title: 'Update installieren',
-        message: 'Fax Inbox wird jetzt beendet und neu gestartet.',
+        message: 'Inbox wird jetzt beendet und neu gestartet.',
         detail: linuxDeb
           ? 'Gleich erscheint die Passwort-Abfrage zur Installation. Nach Bestätigung startet die App automatisch neu.'
           : 'Gleich öffnet sich der Installer. Bitte kurz warten — die App startet danach automatisch wieder.',
