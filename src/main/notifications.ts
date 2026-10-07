@@ -21,7 +21,7 @@ export function showNewFaxNotification(
   const icon = loadTrayIconFromFile(1)
 
   const options: Electron.NotificationConstructorOptions = {
-    title: 'Neues Fax',
+    title: 'Neues Dokument',
     body: fileName,
     icon,
     silent: false,

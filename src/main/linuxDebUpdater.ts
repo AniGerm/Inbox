@@ -9,7 +9,7 @@ import { createWriteStream } from 'node:fs'
 
 const OWNER = 'AniGerm'
 const REPO = 'Inbox'
-const USER_AGENT = 'Fax-Inbox-Updater'
+const USER_AGENT = 'Inbox-Updater'
 
 export type DebReleaseInfo = {
   version: string
@@ -136,7 +136,9 @@ export async function fetchLatestDebRelease(): Promise<DebReleaseInfo | null> {
     `https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`,
   )
   const version = release.tag_name.replace(/^v/i, '')
-  const asset = (release.assets || []).find((a) => /^Fax-Inbox-.*\.deb$/i.test(a.name))
+  const asset = (release.assets || []).find(
+    (a) => /^(Inbox|Fax-Inbox)-.*\.deb$/i.test(a.name),
+  )
   if (!asset) return null
   return {
     version,
@@ -189,7 +191,7 @@ export function quitAndInstallDeb(
     : ''
 
   const script = `#!/bin/bash
-# Keep running after Fax Inbox exits
+# Keep running after Inbox exits
 trap '' HUP
 exec >>/tmp/fax-inbox-update.log 2>&1
 echo "==== $(date -Is) update install start ===="

@@ -50,8 +50,8 @@ export default function AssignDialog({
       >
         <h2>Nutzer zuweisen</h2>
         <p className="field-hint">
-          Das Dokument erscheint dann nur noch in der Empfänger-Ansicht dieses Benutzers.
-          Am Empfang bleibt es mit Zuweisungsstatus sichtbar.
+          Das Dokument erscheint in der Empfänger-Ansicht dieses Benutzers. Am Empfang bleibt es
+          mit Zuweisungsstatus sichtbar.
         </p>
         {users.length === 0 ? (
           <p className="field-hint">

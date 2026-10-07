@@ -1,4 +1,4 @@
-﻿# Fax Inbox — Dev-Setup (Windows)
+﻿# Inbox — Dev-Setup (Windows)
 # Für Fire-and-forget inkl. Startmenü: .\install.ps1
 param(
   [switch]$Dev,
@@ -31,7 +31,7 @@ if ($Install) {
   exit $LASTEXITCODE
 }
 
-Write-Host "=== Fax Inbox Dev-Setup (Windows) ==="
+Write-Host "=== Inbox Dev-Setup (Windows) ==="
 Write-Host "Tipp: Für echte Installation mit Startmenü -> .\install.ps1"
 Write-Host ""
 

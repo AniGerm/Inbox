@@ -1,4 +1,4 @@
-﻿# Fax Inbox — Fire-and-forget Installation (Windows)
+﻿# Inbox — Fire-and-forget Installation (Windows)
 # Installiert bei Bedarf Node.js (winget), baut NSIS-Installer + portable EXE
 # und startet die Setup-.exe (Startmenü + Desktop-Verknüpfung).
 # Die fertige App braucht zur Laufzeit KEIN Node.
@@ -37,7 +37,7 @@ Usage: .\scripts\install.ps1 [-NoLaunch]
   exit 0
 }
 
-Write-Host "=== Fax Inbox — Installation (Windows) ==="
+Write-Host "=== Inbox — Installation (Windows) ==="
 Write-Host "Arbeitsverzeichnis: $Root"
 Write-Host ""
 
@@ -122,7 +122,7 @@ $setup = Get-ChildItem -Path "release" -Filter "*Setup*.exe" -ErrorAction Silent
   Select-Object -First 1
 
 if (-not $setup) {
-  # electron-builder may name artifact Fax-Inbox-Setup-0.1.0.exe
+  # electron-builder may name artifact Inbox-Setup-0.1.0.exe
   $setup = Get-ChildItem -Path "release" -Filter "*.exe" -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -notmatch 'portable|Portable' -and $_.Name -notmatch '\.blockmap$' } |
     Sort-Object LastWriteTime -Descending |
@@ -145,7 +145,7 @@ if (-not $setup) {
 Write-Ok "Installer: $($setup.FullName)"
 Write-Ok "App-Version laut package.json: $((Get-Content package.json | ConvertFrom-Json).version)"
 Write-Host ""
-Write-Host "Die Setup-.exe richtet Fax Inbox im Startmenü und optional als Desktop-Verknüpfung ein."
+Write-Host "Die Setup-.exe richtet Inbox im Startmenü und optional als Desktop-Verknüpfung ein."
 Write-Host "Hinweis: Die installierte App enthält Electron bereits — Node wird nur zum Bauen gebraucht."
 Write-Host ""
 
@@ -156,10 +156,10 @@ if (-not $NoLaunch) {
 
   # Verify real install (Start Menu + installed exe) — portable/dev launches leave no shortcuts.
   $candidates = @(
-    "$env:LOCALAPPDATA\Programs\fax-inbox\Fax Inbox.exe",
-    "$env:LOCALAPPDATA\Programs\Fax Inbox\Fax Inbox.exe",
-    "$env:ProgramFiles\Fax Inbox\Fax Inbox.exe",
-    "${env:ProgramFiles(x86)}\Fax Inbox\Fax Inbox.exe"
+    "$env:LOCALAPPDATA\Programs\fax-inbox\Inbox.exe",
+    "$env:LOCALAPPDATA\Programs\Inbox\Inbox.exe",
+    "$env:ProgramFiles\Inbox\Inbox.exe",
+    "${env:ProgramFiles(x86)}\Inbox\Inbox.exe"
   )
   $installed = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 
@@ -179,7 +179,7 @@ if (-not $NoLaunch) {
     Write-Ok "Installation erkannt."
     if ($installed) { Write-Ok "App: $installed" }
     if ($shortcut) { Write-Ok "Startmenü: $($shortcut.FullName)" }
-    Write-Host "Zum Starten: Startmenü öffnen und nach „Fax Inbox“ suchen." -ForegroundColor Cyan
+    Write-Host "Zum Starten: Startmenü öffnen und nach „Inbox“ suchen." -ForegroundColor Cyan
   } else {
     Write-Warn "Kein Startmenü-Eintrag / keine installierte EXE gefunden."
     Write-Warn "Vermutlich wurde der Setup-Assistent abgebrochen — oder nur die App kurz gestartet."

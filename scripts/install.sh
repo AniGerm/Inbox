@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fax Inbox — Fire-and-forget Installation (Ubuntu/Linux)
+# Inbox — Fire-and-forget Installation (Ubuntu/Linux)
 # Installiert bei Bedarf Node.js, baut AppImage + .deb und richtet die App
 # im Anwendungsmenü ein. Die fertige App braucht zur Laufzeit KEIN Node.
 set -euo pipefail
@@ -45,7 +45,7 @@ EOF
   esac
 done
 
-echo "=== Fax Inbox — Installation ==="
+echo "=== Inbox — Installation ==="
 echo "Arbeitsverzeichnis: $ROOT"
 echo
 
@@ -180,8 +180,9 @@ run_root apt-get install -f -y >/dev/null 2>&1 || true
 # electron-builder postinst often fails when productName contains a space.
 fix_chrome_sandbox() {
   local candidates=(
-    "/opt/Fax Inbox/chrome-sandbox"
+    "/opt/Inbox/chrome-sandbox"
     "/opt/fax-inbox/chrome-sandbox"
+    "/opt/Fax Inbox/chrome-sandbox"
     "/opt/Fax-Inbox/chrome-sandbox"
   )
   local found=""
@@ -216,7 +217,7 @@ fix_chrome_sandbox() {
 
   # CLI wrapper
   local app_bin=""
-  for c in "/opt/Fax Inbox/fax-inbox" "/opt/fax-inbox/fax-inbox" "/opt/Fax-Inbox/fax-inbox"; do
+  for c in "/opt/Inbox/fax-inbox" "/opt/fax-inbox/fax-inbox" "/opt/Fax Inbox/fax-inbox" "/opt/Fax-Inbox/fax-inbox"; do
     if [[ -x "$c" ]]; then
       app_bin="$c"
       break
@@ -241,14 +242,14 @@ fix_chrome_sandbox
 
 # Stop any running instance so the newly installed binary wins on next launch
 # (Electron's single-instance lock would otherwise keep the old UI alive).
-if pgrep -f 'Fax Inbox/fax-inbox' >/dev/null 2>&1; then
-  info "Beende laufende Fax Inbox-Instanz…"
-  pkill -f 'Fax Inbox/fax-inbox' 2>/dev/null || true
+if pgrep -f 'fax-inbox' >/dev/null 2>&1; then
+  info "Beende laufende Inbox-Instanz…"
+  pkill -f 'fax-inbox' 2>/dev/null || true
   for i in 1 2 3 4 5; do
-    pgrep -f 'Fax Inbox/fax-inbox' >/dev/null 2>&1 || break
+    pgrep -f 'fax-inbox' >/dev/null 2>&1 || break
     sleep 1
   done
-  pkill -9 -f 'Fax Inbox/fax-inbox' 2>/dev/null || true
+  pkill -9 -f 'fax-inbox' 2>/dev/null || true
   ok "Alte Instanz beendet"
 fi
 
@@ -259,7 +260,7 @@ fi
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
   run_root gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
 fi
-ok "Fax Inbox ist im Anwendungsmenü (Kategorie Büro/Office)"
+ok "Inbox ist im Anwendungsmenü (Kategorie Büro/Office)"
 
 # AppImage copy for portable use
 if [[ -n "$APPIMAGE" ]]; then
@@ -272,7 +273,7 @@ fi
 
 echo
 ok "Installation abgeschlossen."
-echo "  Menü:   „Fax Inbox“ suchen und starten"
+echo "  Menü:   „Inbox“ suchen und starten"
 echo "  CLI:    fax-inbox"
 [[ -n "$APPIMAGE" ]] && echo "  AppImage: ~/Applications/$(basename "$APPIMAGE")"
 echo
@@ -284,7 +285,7 @@ if [[ "$SKIP_LAUNCH" -eq 0 ]]; then
 
   launch_and_verify() {
     local cmd=("$@")
-    info "Starte Fax Inbox… (Log: $LOG)"
+    info "Starte Inbox… (Log: $LOG)"
     {
       echo "=== $(date -Iseconds) launch: ${cmd[*]} ==="
       echo "DISPLAY=${DISPLAY-} WAYLAND_DISPLAY=${WAYLAND_DISPLAY-} XDG_SESSION_TYPE=${XDG_SESSION_TYPE-}"
@@ -303,7 +304,7 @@ if [[ "$SKIP_LAUNCH" -eq 0 ]]; then
       warn "Oder Log prüfen: $LOG"
       return 1
     fi
-    ok "Fax Inbox läuft (PID $pid) — Fenster sollte sichtbar sein"
+    ok "Inbox läuft (PID $pid) — Fenster sollte sichtbar sein"
     return 0
   }
 

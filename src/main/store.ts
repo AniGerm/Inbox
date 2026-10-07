@@ -4,6 +4,7 @@ import path from 'node:path'
 import {
   DEFAULT_SETTINGS,
   normalizeAppMode,
+  normalizeAutoArchiveDays,
   normalizeFaxFolders,
   normalizeUserName,
   type AppSettings,
@@ -87,6 +88,11 @@ export function loadSettings(): AppSettings {
     stateFolder: normalizeOptionalFolder(raw.stateFolder),
     appMode: normalizeAppMode(raw.appMode),
     clientUserName: normalizeUserName(raw.clientUserName),
+    autoArchiveEnabled:
+      typeof raw.autoArchiveEnabled === 'boolean'
+        ? raw.autoArchiveEnabled
+        : DEFAULT_SETTINGS.autoArchiveEnabled,
+    autoArchiveAfterDays: normalizeAutoArchiveDays(raw.autoArchiveAfterDays),
   }
 }
 

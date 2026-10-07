@@ -38,6 +38,27 @@ const api = {
     ipcRenderer.invoke('rename-fax', filePath, newName),
   assignFax: (filePath: string, userName: string | null): Promise<FaxItem[]> =>
     ipcRenderer.invoke('assign-fax', filePath, userName),
+  assignMany: (filePaths: string[], userName: string | null): Promise<FaxItem[]> =>
+    ipcRenderer.invoke('assign-many', filePaths, userName),
+  setPriority: (filePath: string, priority: boolean): Promise<FaxItem[]> =>
+    ipcRenderer.invoke('set-priority', filePath, priority),
+  setPriorityMany: (filePaths: string[], priority: boolean): Promise<FaxItem[]> =>
+    ipcRenderer.invoke('set-priority-many', filePaths, priority),
+  setNote: (filePath: string, note: string | null): Promise<FaxItem[]> =>
+    ipcRenderer.invoke('set-note', filePath, note),
+  setTags: (filePath: string, tags: string[]): Promise<FaxItem[]> =>
+    ipcRenderer.invoke('set-tags', filePath, tags),
+  setTagsMany: (
+    filePaths: string[],
+    tags: string[],
+    mode?: 'replace' | 'add',
+  ): Promise<FaxItem[]> => ipcRenderer.invoke('set-tags-many', filePaths, tags, mode),
+  archiveMany: (filePaths: string[]): Promise<FaxItem[]> =>
+    ipcRenderer.invoke('archive-many', filePaths),
+  deleteMany: (
+    filePaths: string[],
+  ): Promise<{ deleted: boolean; items: FaxItem[] }> =>
+    ipcRenderer.invoke('delete-many', filePaths),
   getUsers: (): Promise<string[]> => ipcRenderer.invoke('get-users'),
   addUser: (name: string): Promise<string[]> => ipcRenderer.invoke('add-user', name),
   removeUser: (name: string): Promise<string[]> => ipcRenderer.invoke('remove-user', name),

@@ -81,6 +81,9 @@ function seed() {
             exportedAt: null,
             assignedTo: null,
             assignedAt: null,
+      priority: false,
+      note: null,
+      tags: [],
           },
           {
             path: path.join(faxDir, 'termin-bestaetigung.pdf'),
@@ -164,6 +167,9 @@ app.whenReady().then(async () => {
       exportedAt: null,
       assignedTo: null,
       assignedAt: null,
+      priority: false,
+      note: null,
+      tags: [],
     },
     {
       path: path.join(faxDir, 'termin-bestaetigung.pdf'),
@@ -178,6 +184,9 @@ app.whenReady().then(async () => {
       exportedAt: new Date(Date.now() - 80_000_000).toISOString(),
       assignedTo: 'Max',
       assignedAt: new Date(Date.now() - 85_000_000).toISOString(),
+      priority: true,
+      note: 'Bitte in Akte ablegen',
+      tags: ['Patient'],
     },
     {
       path: path.join(faxDir, 'rechnung-alt.pdf'),
@@ -192,6 +201,9 @@ app.whenReady().then(async () => {
       exportedAt: null,
       assignedTo: null,
       assignedAt: null,
+      priority: false,
+      note: null,
+      tags: [],
     },
   ]
 
@@ -201,6 +213,8 @@ app.whenReady().then(async () => {
     autostart: false,
     appMode: 'reception',
     clientUserName: null,
+    autoArchiveEnabled: false,
+    autoArchiveAfterDays: 30,
   }
 
   ipcMain.handle('get-settings', () => settings)

@@ -28,6 +28,7 @@ import {
 import type { AppSettings, FaxItem } from '../shared/types'
 import {
   normalizeAppMode,
+  normalizeAutoArchiveDays,
   normalizeFaxFolders,
   normalizeUserName,
   normalizeUsers,
@@ -101,7 +102,7 @@ function createWindow(): BrowserWindow {
     height: 720,
     minWidth: 800,
     minHeight: 520,
-    title: 'Fax Inbox',
+    title: 'Inbox',
     backgroundColor: '#f2f5fa',
     show: false,
     // No Electron File/Edit/View chrome on Windows/Ubuntu
@@ -135,7 +136,7 @@ function createWindow(): BrowserWindow {
     console.error('Window load failed:', code, desc, url)
     reveal()
     void dialog.showErrorBox(
-      'Fax Inbox',
+      'Inbox',
       `Die Oberfläche konnte nicht geladen werden.\n\n${desc} (${code})`,
     )
   })
@@ -160,10 +161,10 @@ function updateTray(): void {
   if (!tray) return
   const label =
     unreadCount === 0
-      ? 'Fax Inbox'
+      ? 'Inbox'
       : unreadCount === 1
-        ? 'Fax Inbox — 1 ungelesen'
-        : `Fax Inbox — ${unreadCount} ungelesen`
+        ? 'Inbox — 1 ungelesen'
+        : `Inbox — ${unreadCount} ungelesen`
   tray.setToolTip(label)
   tray.setImage(loadTrayIconFromFile(unreadCount))
 
@@ -522,6 +523,12 @@ function registerIpc(): void {
     if (partial.clientUserName !== undefined) {
       next.clientUserName = normalizeUserName(partial.clientUserName)
     }
+    if (partial.autoArchiveEnabled !== undefined) {
+      next.autoArchiveEnabled = partial.autoArchiveEnabled === true
+    }
+    if (partial.autoArchiveAfterDays !== undefined) {
+      next.autoArchiveAfterDays = normalizeAutoArchiveDays(partial.autoArchiveAfterDays)
+    }
     // Drop client user if no longer in the shared list
     const users = watcher?.getUsers() ?? normalizeUsers(loadInboxState().users)
     if (
@@ -529,9 +536,6 @@ function registerIpc(): void {
       !users.some((u) => u.toLowerCase() === next.clientUserName!.toLowerCase())
     ) {
       next.clientUserName = null
-    }
-    if (next.appMode === 'reception') {
-      // Keep stored name for convenience when switching back to recipient
     }
     saveSettings(next)
     if (partial.autostart !== undefined) {
@@ -553,12 +557,18 @@ function registerIpc(): void {
       // Recompute tray/unread for role filter without rescan
       broadcastState(latestItems, unreadCount)
     }
+    if (
+      partial.autoArchiveEnabled !== undefined ||
+      partial.autoArchiveAfterDays !== undefined
+    ) {
+      watcher?.runAutoArchive()
+    }
     return next
   })
 
   ipcMain.handle('pick-fax-folder', async () => {
     const result = await dialog.showOpenDialog(mainWindow!, {
-      title: 'Faxordner wählen',
+      title: 'Eingangsordner wählen',
       properties: ['openDirectory', 'createDirectory'],
     })
     if (result.canceled || result.filePaths.length === 0) return null
@@ -641,8 +651,8 @@ function registerIpc(): void {
       buttons: ['Löschen', 'Abbrechen'],
       defaultId: 1,
       cancelId: 1,
-      title: 'Fax löschen',
-      message: 'Dieses Fax wirklich löschen?',
+      title: 'Dokument löschen',
+      message: 'Dieses Dokument wirklich löschen?',
       detail: path.basename(filePath),
       noLink: true,
     })
@@ -669,6 +679,71 @@ function registerIpc(): void {
   ipcMain.handle('assign-fax', (_e, filePath: string, userName: string | null) => {
     if (!watcher) throw new Error('Watcher nicht bereit')
     return watcher.assignFax(filePath, userName)
+  })
+
+  ipcMain.handle(
+    'assign-many',
+    (_e, filePaths: string[], userName: string | null) => {
+      if (!watcher) throw new Error('Watcher nicht bereit')
+      return watcher.assignMany(filePaths, userName)
+    },
+  )
+
+  ipcMain.handle('set-priority', (_e, filePath: string, priority: boolean) => {
+    if (!watcher) throw new Error('Watcher nicht bereit')
+    return watcher.setPriority(filePath, priority)
+  })
+
+  ipcMain.handle(
+    'set-priority-many',
+    (_e, filePaths: string[], priority: boolean) => {
+      if (!watcher) throw new Error('Watcher nicht bereit')
+      return watcher.setPriorityMany(filePaths, priority)
+    },
+  )
+
+  ipcMain.handle('set-note', (_e, filePath: string, note: string | null) => {
+    if (!watcher) throw new Error('Watcher nicht bereit')
+    return watcher.setNote(filePath, note)
+  })
+
+  ipcMain.handle('set-tags', (_e, filePath: string, tags: string[]) => {
+    if (!watcher) throw new Error('Watcher nicht bereit')
+    return watcher.setTags(filePath, tags)
+  })
+
+  ipcMain.handle(
+    'set-tags-many',
+    (_e, filePaths: string[], tags: string[], mode?: 'replace' | 'add') => {
+      if (!watcher) throw new Error('Watcher nicht bereit')
+      return watcher.setTagsMany(filePaths, tags, mode === 'replace' ? 'replace' : 'add')
+    },
+  )
+
+  ipcMain.handle('archive-many', (_e, filePaths: string[]) => {
+    if (!watcher) throw new Error('Watcher nicht bereit')
+    return watcher.archiveMany(filePaths)
+  })
+
+  ipcMain.handle('delete-many', async (_e, filePaths: string[]) => {
+    const paths = Array.isArray(filePaths)
+      ? filePaths.filter((p) => typeof p === 'string' && p.trim())
+      : []
+    if (paths.length === 0) return { deleted: false, items: latestItems }
+    const { response } = await dialog.showMessageBox(mainWindow!, {
+      type: 'warning',
+      buttons: ['Löschen', 'Abbrechen'],
+      defaultId: 1,
+      cancelId: 1,
+      title: 'Dokumente löschen',
+      message: `${paths.length} Dokument(e) wirklich löschen?`,
+      detail: 'Diese Aktion kann nicht rückgängig gemacht werden.',
+      noLink: true,
+    })
+    if (response !== 0) return { deleted: false, items: latestItems }
+    if (!watcher) throw new Error('Watcher nicht bereit')
+    const items = watcher.removeMany(paths)
+    return { deleted: true, items }
   })
 
   ipcMain.handle('get-users', () => {
@@ -733,9 +808,9 @@ if (!gotSingleInstanceLock) {
   // installed before the .deb upgrade. Exit silently; the running instance
   // will be focused by the OS or by our second-instance handler below.
   console.warn(
-    `[Fax Inbox] Second instance detected (this binary: ${app.getVersion()}). ` +
+    `[Inbox] Second instance detected (this binary: ${app.getVersion()}). ` +
       `Exiting. If you just installed an update, quit the running app from the ` +
-      `tray menu ("Beenden") and start Fax Inbox again.`,
+      `tray menu ("Beenden") and start Inbox again.`,
   )
   app.exit(0)
 } else {
@@ -781,7 +856,7 @@ if (!gotSingleInstanceLock) {
   }).catch((err) => {
     console.error('App-Start fehlgeschlagen:', err)
     dialog.showErrorBox(
-      'Fax Inbox',
+      'Inbox',
       `Start fehlgeschlagen:\n\n${err instanceof Error ? err.message : String(err)}`,
     )
     app.exit(1)

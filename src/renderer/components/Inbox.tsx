@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AppMode, ExportStatus, FaxItem, PrintStatus } from '../../shared/types'
+import {
+  collectAllTags,
+  itemMatchesFilters,
+  itemMatchesQuery,
+  type ListFilters,
+} from '../../shared/search'
 import PdfPreview from './PdfPreview'
 import RenameDialog from './RenameDialog'
 import AssignDialog from './AssignDialog'
+import NoteDialog from './NoteDialog'
+import TagsDialog from './TagsDialog'
 
 type ViewMode = 'inbox' | 'archive'
 type DayBucket = 'heute' | 'gestern' | 'vorgestern' | 'spaeter'
@@ -31,6 +39,14 @@ const BUCKET_LABEL: Record<DayBucket, string> = {
   spaeter: 'Später',
 }
 
+const EMPTY_FILTERS: ListFilters = {
+  unreadOnly: false,
+  priorityOnly: false,
+  withNoteOnly: false,
+  unassignedOnly: false,
+  tag: null,
+}
+
 function startOfLocalDay(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
 }
@@ -45,6 +61,14 @@ function bucketFor(iso: string, now = new Date()): DayBucket {
   return 'spaeter'
 }
 
+function sortGroupItems(items: FaxItem[]): FaxItem[] {
+  return [...items].sort((a, b) => {
+    const p = Number(!!b.priority) - Number(!!a.priority)
+    if (p !== 0) return p
+    return new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime()
+  })
+}
+
 function groupByDay(items: FaxItem[]): Array<{ key: DayBucket; label: string; items: FaxItem[] }> {
   const buckets = new Map<DayBucket, FaxItem[]>()
   for (const key of BUCKET_ORDER) buckets.set(key, [])
@@ -54,7 +78,7 @@ function groupByDay(items: FaxItem[]): Array<{ key: DayBucket; label: string; it
   return BUCKET_ORDER.map((key) => ({
     key,
     label: BUCKET_LABEL[key],
-    items: buckets.get(key)!,
+    items: sortGroupItems(buckets.get(key)!),
   })).filter((g) => g.items.length > 0)
 }
 
@@ -86,7 +110,6 @@ function formatPrintedAt(iso: string): string {
   }).format(new Date(iso))
 }
 
-/** Compact print time for sidebar under the status icon */
 function formatPrintedAtShort(iso: string): string {
   const d = new Date(iso)
   const time = new Intl.DateTimeFormat('de-DE', {
@@ -125,9 +148,7 @@ function printStatusLabel(item: FaxItem): string {
     case 'printing':
       return 'Wird gedruckt…'
     case 'printed':
-      return item.printedAt
-        ? `Gedruckt ${formatPrintedAt(item.printedAt)}`
-        : 'Gedruckt'
+      return item.printedAt ? `Gedruckt ${formatPrintedAt(item.printedAt)}` : 'Gedruckt'
     case 'error':
       return 'Druck fehlgeschlagen'
     default:
@@ -141,9 +162,7 @@ function exportStatusLabel(item: FaxItem): string {
     case 'exporting':
       return 'Wird kopiert…'
     case 'exported':
-      return item.exportedAt
-        ? `Exportiert ${formatPrintedAt(item.exportedAt)}`
-        : 'Exportiert'
+      return item.exportedAt ? `Exportiert ${formatPrintedAt(item.exportedAt)}` : 'Exportiert'
     case 'error':
       return 'Export fehlgeschlagen'
     default:
@@ -182,19 +201,10 @@ function PrinterIcon({ slashed = false }: { slashed?: boolean }) {
   )
 }
 
-/** Hard-disk / storage glyph — slashed = not exported yet */
 function StorageIcon({ slashed = false }: { slashed?: boolean }) {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect
-        x="4"
-        y="6"
-        width="16"
-        height="12"
-        rx="2"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      />
+      <rect x="4" y="6" width="16" height="12" rx="2" stroke="currentColor" strokeWidth="1.6" />
       <path d="M4 12h16" stroke="currentColor" strokeWidth="1.6" />
       <circle cx="8" cy="15.5" r="1.1" fill="currentColor" />
       {slashed ? (
@@ -208,12 +218,7 @@ function StatusSpinner() {
   return (
     <svg className="print-status-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" opacity="0.25" />
-      <path
-        d="M21 12a9 9 0 0 0-9-9"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   )
 }
@@ -256,7 +261,6 @@ function ExportStatusIcon({ status }: { status: ExportStatus }) {
   return <StorageIcon slashed />
 }
 
-/** Person / user glyph — slashed = not assigned */
 function UserIcon({ slashed = false }: { slashed?: boolean }) {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -270,6 +274,38 @@ function UserIcon({ slashed = false }: { slashed?: boolean }) {
       {slashed ? (
         <path d="M4 20 20 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       ) : null}
+    </svg>
+  )
+}
+
+function FlagIcon({ filled = false }: { filled?: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M5 21V4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path
+        d="M5 4h11l-2.2 3.5L16 11H5V4Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+        fill={filled ? 'currentColor' : 'none'}
+        opacity={filled ? 0.9 : 1}
+      />
+    </svg>
+  )
+}
+
+function PostItIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M6 4h9l5 5v11H6V4Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+        fill="currentColor"
+        fillOpacity="0.12"
+      />
+      <path d="M15 4v5h5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -303,7 +339,15 @@ export default function Inbox({
   const [renaming, setRenaming] = useState(false)
   const [assigning, setAssigning] = useState(false)
   const [assignUsers, setAssignUsers] = useState<string[]>([])
+  const [assignTargets, setAssignTargets] = useState<string[] | null>(null)
+  const [noteEditing, setNoteEditing] = useState(false)
+  const [tagsEditing, setTagsEditing] = useState(false)
+  const [tagsTargets, setTagsTargets] = useState<string[] | null>(null)
   const [exporting, setExporting] = useState(false)
+  const [query, setQuery] = useState('')
+  const [filters, setFilters] = useState<ListFilters>(EMPTY_FILTERS)
+  const [selectedSet, setSelectedSet] = useState<Set<string>>(() => new Set())
+  const lastClickedPath = useRef<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
   const isReception = appMode !== 'recipient'
@@ -315,10 +359,18 @@ export default function Inbox({
     return items.filter((i) => i.assignedTo === recipientName)
   }, [items, isReception, recipientName])
 
-  const visible = useMemo(
+  const archiveScoped = useMemo(
     () => roleFiltered.filter((i) => (view === 'archive' ? i.archived : !i.archived)),
     [roleFiltered, view],
   )
+
+  const visible = useMemo(() => {
+    return archiveScoped.filter(
+      (i) => itemMatchesQuery(i, query) && itemMatchesFilters(i, filters),
+    )
+  }, [archiveScoped, query, filters])
+
+  const tagSuggestions = useMemo(() => collectAllTags(roleFiltered), [roleFiltered])
 
   const displayUnread = useMemo(() => {
     if (isReception) return unreadCount
@@ -328,7 +380,11 @@ export default function Inbox({
   const groups = useMemo(() => groupByDay(visible), [visible])
 
   const selected = roleFiltered.find((i) => i.path === selectedPath) ?? null
-  const selectedVisible = selected && visible.some((i) => i.path === selected.path) ? selected : null
+  const selectedVisible =
+    selected && visible.some((i) => i.path === selected.path) ? selected : null
+
+  const selectedCount = selectedSet.size
+  const dialogOpen = renaming || assigning || noteEditing || tagsEditing
 
   useEffect(() => {
     if (selectedPath && !visible.some((i) => i.path === selectedPath)) {
@@ -337,6 +393,16 @@ export default function Inbox({
       setSelectedPath(visible[0].path)
     }
   }, [visible, selectedPath])
+
+  useEffect(() => {
+    setSelectedSet((prev) => {
+      const next = new Set<string>()
+      for (const p of prev) {
+        if (visible.some((i) => i.path === p)) next.add(p)
+      }
+      return next.size === prev.size ? prev : next
+    })
+  }, [visible])
 
   const selectItem = useCallback(
     async (item: FaxItem) => {
@@ -355,7 +421,6 @@ export default function Inbox({
     if (target) {
       setView(target.archived ? 'archive' : 'inbox')
       void selectItem(target)
-      // Scroll selected into view after paint
       requestAnimationFrame(() => {
         const el = listRef.current?.querySelector(`[data-path="${CSS.escape(focusPath)}"]`)
         el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
@@ -369,17 +434,12 @@ export default function Inbox({
     setView('inbox')
     const newest = roleFiltered.find((i) => !i.archived)
     if (newest) void selectItem(newest)
-    // Only react to tray/focus-newest signals — NOT to every items update
-    // (otherwise markUnseen would immediately get marked seen again).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusNewestToken])
 
   const print = useCallback(async () => {
     if (!selectedVisible) return
-    if (
-      selectedVisible.printStatus === 'printed' &&
-      selectedVisible.printedAt
-    ) {
+    if (selectedVisible.printStatus === 'printed' && selectedVisible.printedAt) {
       const ok = window.confirm(formatReprintConfirm(selectedVisible.printedAt))
       if (!ok) return
     }
@@ -401,10 +461,7 @@ export default function Inbox({
       if (go) onOpenSettings()
       return
     }
-    if (
-      selectedVisible.exportStatus === 'exported' &&
-      selectedVisible.exportedAt
-    ) {
+    if (selectedVisible.exportStatus === 'exported' && selectedVisible.exportedAt) {
       const ok = window.confirm(formatReexportConfirm(selectedVisible.exportedAt))
       if (!ok) return
     }
@@ -439,6 +496,11 @@ export default function Inbox({
         view === 'archive' ? i.archived : !i.archived,
       )
       setSelectedPath(nextVisible[0]?.path ?? null)
+      setSelectedSet((prev) => {
+        const next = new Set(prev)
+        next.delete(selectedVisible.path)
+        return next
+      })
     }
   }, [selectedVisible, onItemsChange, view, applyRoleFilter])
 
@@ -478,34 +540,159 @@ export default function Inbox({
     [selectedVisible, onItemsChange],
   )
 
-  const openAssign = useCallback(async () => {
-    if (!selectedVisible || !isReception) return
-    try {
-      const list =
-        typeof window.faxInbox.getUsers === 'function'
-          ? await window.faxInbox.getUsers()
-          : []
-      setAssignUsers(list)
-    } catch (err) {
-      console.error(err)
-      setAssignUsers([])
-    }
-    setAssigning(true)
-  }, [selectedVisible, isReception])
+  const openAssign = useCallback(
+    async (paths?: string[]) => {
+      if (!isReception) return
+      try {
+        const list =
+          typeof window.faxInbox.getUsers === 'function'
+            ? await window.faxInbox.getUsers()
+            : []
+        setAssignUsers(list)
+      } catch (err) {
+        console.error(err)
+        setAssignUsers([])
+      }
+      setAssignTargets(paths ?? null)
+      setAssigning(true)
+    },
+    [isReception],
+  )
 
   const handleAssign = useCallback(
     async (userName: string | null) => {
-      if (!selectedVisible) return
-      const next = await window.faxInbox.assignFax(selectedVisible.path, userName)
+      const targets = assignTargets ?? (selectedVisible ? [selectedVisible.path] : [])
+      if (targets.length === 0) return
+      const next =
+        targets.length === 1
+          ? await window.faxInbox.assignFax(targets[0], userName)
+          : await window.faxInbox.assignMany(targets, userName)
       onItemsChange(next)
       setAssigning(false)
+      setAssignTargets(null)
+      setSelectedSet(new Set())
+    },
+    [assignTargets, selectedVisible, onItemsChange],
+  )
+
+  const togglePriority = useCallback(async () => {
+    if (!selectedVisible) return
+    const next = await window.faxInbox.setPriority(
+      selectedVisible.path,
+      !selectedVisible.priority,
+    )
+    onItemsChange(next)
+  }, [selectedVisible, onItemsChange])
+
+  const handleNote = useCallback(
+    async (note: string | null) => {
+      if (!selectedVisible) return
+      const next = await window.faxInbox.setNote(selectedVisible.path, note)
+      onItemsChange(next)
+      setNoteEditing(false)
     },
     [selectedVisible, onItemsChange],
   )
 
+  const handleTags = useCallback(
+    async (tags: string[]) => {
+      const targets = tagsTargets ?? (selectedVisible ? [selectedVisible.path] : [])
+      if (targets.length === 0) return
+      const next =
+        targets.length === 1
+          ? await window.faxInbox.setTags(targets[0], tags)
+          : await window.faxInbox.setTagsMany(targets, tags, 'add')
+      onItemsChange(next)
+      setTagsEditing(false)
+      setTagsTargets(null)
+      if (targets.length > 1) setSelectedSet(new Set())
+    },
+    [tagsTargets, selectedVisible, onItemsChange],
+  )
+
+  const toggleSelect = useCallback((path: string, shiftKey: boolean) => {
+    setSelectedSet((prev) => {
+      const next = new Set(prev)
+      if (shiftKey && lastClickedPath.current) {
+        const paths = visible.map((i) => i.path)
+        const a = paths.indexOf(lastClickedPath.current)
+        const b = paths.indexOf(path)
+        if (a >= 0 && b >= 0) {
+          const [from, to] = a < b ? [a, b] : [b, a]
+          for (let i = from; i <= to; i += 1) next.add(paths[i])
+          return next
+        }
+      }
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+    lastClickedPath.current = path
+  }, [visible])
+
+  const selectAllVisible = () => {
+    setSelectedSet(new Set(visible.map((i) => i.path)))
+  }
+
+  const clearSelection = () => setSelectedSet(new Set())
+
+  const bulkPriority = async (priority: boolean) => {
+    const paths = [...selectedSet]
+    if (paths.length === 0) return
+    const next = await window.faxInbox.setPriorityMany(paths, priority)
+    onItemsChange(next)
+    clearSelection()
+  }
+
+  const bulkArchive = async () => {
+    const paths = [...selectedSet]
+    if (paths.length === 0) return
+    const next = await window.faxInbox.archiveMany(paths)
+    onItemsChange(next)
+    clearSelection()
+  }
+
+  const bulkExport = async () => {
+    const paths = [...selectedSet]
+    if (paths.length === 0) return
+    if (!exportFolder?.trim()) {
+      const go = window.confirm(
+        'Noch kein Exportordner gesetzt.\n\nEinstellungen öffnen?',
+      )
+      if (go) onOpenSettings()
+      return
+    }
+    setExporting(true)
+    try {
+      let latest = items
+      for (const p of paths) {
+        const result = await window.faxInbox.exportFax(p)
+        latest = result.items
+      }
+      onItemsChange(latest)
+      clearSelection()
+    } catch (err) {
+      console.error(err)
+      const msg = err instanceof Error ? err.message : 'Kopieren fehlgeschlagen'
+      window.alert(`Stapel-Export fehlgeschlagen:\n\n${msg}`)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const bulkDelete = async () => {
+    const paths = [...selectedSet]
+    if (paths.length === 0) return
+    const result = await window.faxInbox.deleteMany(paths)
+    if (result.deleted) {
+      onItemsChange(result.items)
+      clearSelection()
+    }
+  }
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (renaming || assigning) return
+      if (dialogOpen) return
       const target = e.target as HTMLElement | null
       const tag = target?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return
@@ -522,8 +709,17 @@ export default function Inbox({
         return
       }
 
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault()
+        selectAllVisible()
+        return
+      }
+
       if (e.key === 'Delete') {
-        if (selectedVisible) {
+        if (selectedCount > 0) {
+          e.preventDefault()
+          void bulkDelete()
+        } else if (selectedVisible) {
           e.preventDefault()
           void remove()
         }
@@ -543,18 +739,32 @@ export default function Inbox({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [visible, selectedVisible, selectedPath, print, remove, selectItem, renaming, assigning])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, selectedVisible, selectedPath, print, remove, selectItem, dialogOpen, selectedCount])
 
   const switchView = (mode: ViewMode) => {
     setView(mode)
+    clearSelection()
     const list = roleFiltered.filter((i) => (mode === 'archive' ? i.archived : !i.archived))
     setSelectedPath(list[0]?.path ?? null)
   }
 
+  const toggleFilter = (key: keyof Omit<ListFilters, 'tag'>) => {
+    setFilters((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const filtersActive =
+    filters.unreadOnly ||
+    filters.priorityOnly ||
+    filters.withNoteOnly ||
+    filters.unassignedOnly ||
+    !!filters.tag ||
+    !!query.trim()
+
   return (
     <div className="app">
       <header className="topbar">
-        <h1 className="brand">Fax Inbox</h1>
+        <h1 className="brand">Inbox</h1>
         {displayUnread > 0 && (
           <span className="unread-pill">
             {displayUnread === 1 ? '1 ungelesen' : `${displayUnread} ungelesen`}
@@ -606,7 +816,143 @@ export default function Inbox({
               Archiv
             </button>
           </div>
-          <div className="list-scroll" ref={listRef} role="listbox" aria-label="Faxliste">
+
+          <div className="list-tools">
+            <input
+              className="search-input"
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+              placeholder="Suche Name, Notiz, Tag, Nutzer…"
+              aria-label="Suche"
+            />
+            <div className="filter-chips" role="group" aria-label="Filter">
+              <button
+                type="button"
+                className={`chip ${filters.unreadOnly ? 'is-active' : ''}`}
+                onClick={() => toggleFilter('unreadOnly')}
+              >
+                Ungelesen
+              </button>
+              <button
+                type="button"
+                className={`chip ${filters.priorityOnly ? 'is-active' : ''}`}
+                onClick={() => toggleFilter('priorityOnly')}
+              >
+                Priorität
+              </button>
+              <button
+                type="button"
+                className={`chip ${filters.withNoteOnly ? 'is-active' : ''}`}
+                onClick={() => toggleFilter('withNoteOnly')}
+              >
+                Mit Notiz
+              </button>
+              {isReception ? (
+                <button
+                  type="button"
+                  className={`chip ${filters.unassignedOnly ? 'is-active' : ''}`}
+                  onClick={() => toggleFilter('unassignedOnly')}
+                >
+                  Nicht zugewiesen
+                </button>
+              ) : null}
+              <select
+                className="chip-select"
+                value={filters.tag ?? ''}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    tag: e.target.value ? e.target.value : null,
+                  }))
+                }
+                aria-label="Tag-Filter"
+              >
+                <option value="">Alle Tags</option>
+                {tagSuggestions.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              {filtersActive ? (
+                <button
+                  type="button"
+                  className="chip"
+                  onClick={() => {
+                    setQuery('')
+                    setFilters(EMPTY_FILTERS)
+                  }}
+                >
+                  Zurücksetzen
+                </button>
+              ) : null}
+            </div>
+            <div className="select-tools">
+              <button type="button" className="btn btn-ghost btn-tiny" onClick={selectAllVisible}>
+                Alle sichtbaren
+              </button>
+              {selectedCount > 0 ? (
+                <button type="button" className="btn btn-ghost btn-tiny" onClick={clearSelection}>
+                  Auswahl aufheben ({selectedCount})
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {selectedCount > 0 ? (
+            <div className="bulk-bar" role="toolbar" aria-label="Stapelaktionen">
+              <span className="bulk-count">{selectedCount} gewählt</span>
+              <button type="button" className="btn btn-ghost btn-tiny" onClick={() => void bulkPriority(true)}>
+                Priorität an
+              </button>
+              <button type="button" className="btn btn-ghost btn-tiny" onClick={() => void bulkPriority(false)}>
+                Priorität aus
+              </button>
+              {isReception ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-tiny"
+                  onClick={() => void openAssign([...selectedSet])}
+                >
+                  Zuweisen
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="btn btn-ghost btn-tiny"
+                onClick={() => {
+                  setTagsTargets([...selectedSet])
+                  setTagsEditing(true)
+                }}
+              >
+                Tags
+              </button>
+              {view === 'inbox' ? (
+                <button type="button" className="btn btn-ghost btn-tiny" onClick={() => void bulkArchive()}>
+                  Archivieren
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="btn btn-ghost btn-tiny"
+                disabled={exporting}
+                onClick={() => void bulkExport()}
+              >
+                Export
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-tiny btn-danger"
+                onClick={() => void bulkDelete()}
+              >
+                Löschen
+              </button>
+            </div>
+          ) : null}
+
+          <div className="list-scroll" ref={listRef} role="listbox" aria-label="Dokumentliste">
             {visible.length === 0 ? (
               <div className="empty" style={{ paddingTop: 40 }}>
                 <p>
@@ -615,10 +961,12 @@ export default function Inbox({
                     : !isReception && !recipientName
                       ? 'Kein Benutzer gewählt. Bitte in den Einstellungen „Dieser Client ist“ festlegen.'
                       : !isReception
-                        ? `Keine zugewiesenen Faxe für ${recipientName}.`
-                        : 'Noch keine Faxe.'}
+                        ? `Keine zugewiesenen Dokumente für ${recipientName}.`
+                        : filtersActive
+                          ? 'Keine Treffer für Suche/Filter.'
+                          : 'Noch keine Dokumente.'}
                 </p>
-                {view === 'inbox' && isReception && (
+                {view === 'inbox' && isReception && !filtersActive && (
                   <p className="path" title={(faxFolders ?? [faxFolder]).join('\n')}>
                     Überwacht: {faxFolder}
                   </p>
@@ -633,6 +981,7 @@ export default function Inbox({
                   {group.items.map((item) => {
                     const unread = item.seenAt === null && !item.archived
                     const selectedCls = item.path === selectedPath ? 'is-selected' : ''
+                    const checked = selectedSet.has(item.path)
                     const printStatus: PrintStatus = item.printStatus ?? 'none'
                     const exportStatus: ExportStatus = item.exportStatus ?? 'none'
                     const printLabel = printStatusLabel(item)
@@ -652,73 +1001,119 @@ export default function Inbox({
                         : item.assignedTo
                           ? item.assignedTo
                           : null
+                    const tags = item.tags ?? []
                     return (
-                      <button
+                      <div
                         key={item.path}
-                        type="button"
-                        role="option"
-                        data-path={item.path}
-                        aria-selected={item.path === selectedPath}
-                        className={`list-item ${unread ? 'is-unread' : ''} ${selectedCls}`}
-                        onClick={() => void selectItem(item)}
+                        className={`list-item-row ${unread ? 'is-unread' : ''} ${selectedCls} ${item.priority ? 'is-priority' : ''}`}
                       >
-                        <span className="dot" aria-hidden />
-                        <span className="item-name">{item.name}</span>
-                        <span className="file-status" aria-hidden={false}>
-                          <span
-                            className={`file-status-row is-${printStatus}`}
-                            title={printLabel}
-                            aria-label={printLabel}
-                          >
-                            <PrintStatusIcon status={printStatus} />
-                            {printedShort ? (
-                              <span className="file-status-meta">
-                                <span className="file-status-glyph" aria-hidden>
-                                  <PrinterIcon />
+                        <input
+                          type="checkbox"
+                          className="list-check"
+                          checked={checked}
+                          aria-label={`${item.name} auswählen`}
+                          onChange={() => undefined}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleSelect(item.path, e.shiftKey)
+                          }}
+                        />
+                        <button
+                          type="button"
+                          role="option"
+                          data-path={item.path}
+                          aria-selected={item.path === selectedPath}
+                          className={`list-item ${unread ? 'is-unread' : ''} ${selectedCls}`}
+                          onClick={() => void selectItem(item)}
+                        >
+                          <span className="dot" aria-hidden />
+                          <span className="item-name-block">
+                            <span className="item-name">
+                              {item.priority ? (
+                                <span className="priority-inline" title="Priorität" aria-label="Priorität">
+                                  <FlagIcon filled />
                                 </span>
-                                <span className="file-status-time">{printedShort}</span>
+                              ) : null}
+                              {item.name}
+                            </span>
+                            {tags.length > 0 ? (
+                              <span className="item-tags">
+                                {tags.slice(0, 2).map((t) => (
+                                  <span key={t} className="tag-pill is-compact">
+                                    {t}
+                                  </span>
+                                ))}
+                                {tags.length > 2 ? (
+                                  <span className="tag-pill is-compact">+{tags.length - 2}</span>
+                                ) : null}
+                              </span>
+                            ) : null}
+                            <span className="item-meta" title={`Empfangen ${formatPrintedAt(item.addedAt)}`}>
+                              {formatWhen(item.addedAt, group.key)}
+                            </span>
+                          </span>
+                          <span className="file-status" aria-hidden={false}>
+                            <span
+                              className={`file-status-row is-${printStatus}`}
+                              title={printLabel}
+                              aria-label={printLabel}
+                            >
+                              <PrintStatusIcon status={printStatus} />
+                              {printedShort ? (
+                                <span className="file-status-meta">
+                                  <span className="file-status-glyph" aria-hidden>
+                                    <PrinterIcon />
+                                  </span>
+                                  <span className="file-status-time">{printedShort}</span>
+                                </span>
+                              ) : null}
+                            </span>
+                            <span
+                              className={`file-status-row is-${exportStatus}`}
+                              title={exportLabel}
+                              aria-label={exportLabel}
+                            >
+                              <ExportStatusIcon status={exportStatus} />
+                              {exportedShort ? (
+                                <span className="file-status-meta">
+                                  <span className="file-status-glyph" aria-hidden>
+                                    <StorageIcon />
+                                  </span>
+                                  <span className="file-status-time">{exportedShort}</span>
+                                </span>
+                              ) : null}
+                            </span>
+                            <span
+                              className={`file-status-row ${item.assignedTo ? 'is-assigned' : 'is-unassigned'}`}
+                              title={assignLabel}
+                              aria-label={assignLabel}
+                            >
+                              {item.assignedTo ? <UserIcon /> : <UserIcon slashed />}
+                              {assignedShort ? (
+                                <span className="file-status-meta">
+                                  <span className="file-status-glyph" aria-hidden>
+                                    <UserIcon />
+                                  </span>
+                                  <span className="file-status-time">
+                                    {item.assignedTo && item.assignedAt
+                                      ? `${item.assignedTo} · ${assignedShort}`
+                                      : assignedShort}
+                                  </span>
+                                </span>
+                              ) : null}
+                            </span>
+                            {item.note ? (
+                              <span
+                                className="file-status-row is-note"
+                                title={item.note}
+                                aria-label={`Notiz: ${item.note}`}
+                              >
+                                <PostItIcon />
                               </span>
                             ) : null}
                           </span>
-                          <span
-                            className={`file-status-row is-${exportStatus}`}
-                            title={exportLabel}
-                            aria-label={exportLabel}
-                          >
-                            <ExportStatusIcon status={exportStatus} />
-                            {exportedShort ? (
-                              <span className="file-status-meta">
-                                <span className="file-status-glyph" aria-hidden>
-                                  <StorageIcon />
-                                </span>
-                                <span className="file-status-time">{exportedShort}</span>
-                              </span>
-                            ) : null}
-                          </span>
-                          <span
-                            className={`file-status-row ${item.assignedTo ? 'is-assigned' : 'is-unassigned'}`}
-                            title={assignLabel}
-                            aria-label={assignLabel}
-                          >
-                            {item.assignedTo ? <UserIcon /> : <UserIcon slashed />}
-                            {assignedShort ? (
-                              <span className="file-status-meta">
-                                <span className="file-status-glyph" aria-hidden>
-                                  <UserIcon />
-                                </span>
-                                <span className="file-status-time">
-                                  {item.assignedTo && item.assignedAt
-                                    ? `${item.assignedTo} · ${assignedShort}`
-                                    : assignedShort}
-                                </span>
-                              </span>
-                            ) : null}
-                          </span>
-                        </span>
-                        <span className="item-meta" title={`Empfangen ${formatPrintedAt(item.addedAt)}`}>
-                          {formatWhen(item.addedAt, group.key)}
-                        </span>
-                      </button>
+                        </button>
+                      </div>
                     )
                   })}
                 </section>
@@ -734,6 +1129,28 @@ export default function Inbox({
                 <span className="file-label" title={selectedVisible.name}>
                   {selectedVisible.name}
                 </span>
+                <button
+                  type="button"
+                  className={`btn btn-ghost ${selectedVisible.priority ? 'is-priority-active' : ''}`}
+                  title={selectedVisible.priority ? 'Priorität entfernen' : 'Priorität setzen'}
+                  onClick={() => void togglePriority()}
+                >
+                  <FlagIcon filled={!!selectedVisible.priority} />
+                  Priorität
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => setNoteEditing(true)}>
+                  Notiz
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setTagsTargets(null)
+                    setTagsEditing(true)
+                  }}
+                >
+                  Tags
+                </button>
                 <button type="button" className="btn btn-ghost" onClick={() => setRenaming(true)}>
                   Umbenennen
                 </button>
@@ -745,11 +1162,7 @@ export default function Inbox({
                 <button type="button" className="btn btn-ghost" onClick={() => void archiveOrRestore()}>
                   {selectedVisible.archived ? 'Wiederherstellen' : 'Archivieren'}
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => void print()}
-                >
+                <button type="button" className="btn btn-primary" onClick={() => void print()}>
                   Drucken
                 </button>
                 <button
@@ -763,9 +1176,7 @@ export default function Inbox({
                   }
                   onClick={() => void exportCopy()}
                 >
-                  {exporting
-                    ? 'Kopiere…'
-                    : exportButtonLabel.trim() || 'In Ordner kopieren'}
+                  {exporting ? 'Kopiere…' : exportButtonLabel.trim() || 'In Ordner kopieren'}
                 </button>
                 {isReception ? (
                   <button
@@ -789,6 +1200,12 @@ export default function Inbox({
                   Löschen
                 </button>
               </div>
+              {selectedVisible.note ? (
+                <div className="note-banner" title={selectedVisible.note}>
+                  <PostItIcon />
+                  <span>{selectedVisible.note}</span>
+                </div>
+              ) : null}
               <PdfPreview filePath={selectedVisible.path} />
             </>
           ) : (
@@ -796,12 +1213,12 @@ export default function Inbox({
               <h2>Nichts ausgewählt</h2>
               <p>
                 {view === 'archive'
-                  ? 'Archivierte Faxe erscheinen hier nach dem Archivieren.'
+                  ? 'Archivierte Dokumente erscheinen hier nach dem Archivieren.'
                   : !isReception && !recipientName
                     ? 'In den Einstellungen Modus Empfänger und Benutzer wählen.'
                     : !isReception
-                      ? 'Sobald der Empfang ein Fax zuweist, erscheint es hier.'
-                      : 'Wähle ein Fax links, oder warte auf neue PDFs im überwachten Ordner.'}
+                      ? 'Sobald der Empfang ein Dokument zuweist, erscheint es hier.'
+                      : 'Wähle ein Dokument links, oder warte auf neue PDFs im überwachten Ordner.'}
               </p>
               {isReception ? <p className="path">{faxFolder}</p> : null}
             </div>
@@ -816,12 +1233,46 @@ export default function Inbox({
           onConfirm={(name) => void handleRename(name)}
         />
       )}
-      {assigning && selectedVisible && isReception && (
+      {assigning && isReception && (
         <AssignDialog
-          currentAssignee={selectedVisible.assignedTo}
+          currentAssignee={
+            assignTargets && assignTargets.length === 1
+              ? roleFiltered.find((i) => i.path === assignTargets[0])?.assignedTo ?? null
+              : selectedVisible && !assignTargets
+                ? selectedVisible.assignedTo
+                : null
+          }
           users={assignUsers}
-          onCancel={() => setAssigning(false)}
+          onCancel={() => {
+            setAssigning(false)
+            setAssignTargets(null)
+          }}
           onAssign={(userName) => void handleAssign(userName)}
+        />
+      )}
+      {noteEditing && selectedVisible && (
+        <NoteDialog
+          initialNote={selectedVisible.note}
+          onCancel={() => setNoteEditing(false)}
+          onConfirm={(note) => void handleNote(note)}
+        />
+      )}
+      {tagsEditing && (
+        <TagsDialog
+          initialTags={
+            tagsTargets && tagsTargets.length === 1
+              ? roleFiltered.find((i) => i.path === tagsTargets[0])?.tags ?? []
+              : tagsTargets
+                ? []
+                : selectedVisible?.tags ?? []
+          }
+          suggestions={tagSuggestions}
+          title={tagsTargets && tagsTargets.length > 1 ? 'Tags hinzufügen (Stapel)' : 'Tags'}
+          onCancel={() => {
+            setTagsEditing(false)
+            setTagsTargets(null)
+          }}
+          onConfirm={(tags) => void handleTags(tags)}
         />
       )}
     </div>

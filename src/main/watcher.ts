@@ -1,9 +1,16 @@
 import chokidar, { type FSWatcher } from 'chokidar'
 import fs from 'node:fs'
 import path from 'node:path'
-import { loadInboxState, saveInboxState, getInboxStatePath } from './store'
+import {
+  loadInboxState,
+  saveInboxState,
+  getInboxStatePath,
+  loadSettings,
+} from './store'
 import {
   ARCHIVE_DIR_NAME,
+  normalizeNote,
+  normalizeTags,
   normalizeUsers,
   type ExportStatus,
   type FaxItem,
@@ -21,6 +28,9 @@ type KnownItem = {
   exportedAt?: string | null
   assignedTo?: string | null
   assignedAt?: string | null
+  priority?: boolean
+  note?: string | null
+  tags?: string[]
 }
 
 function assignmentFieldsFromKnown(
@@ -35,6 +45,16 @@ function assignmentFieldsFromKnown(
       ? existing.assignedAt
       : null
   return { assignedTo, assignedAt }
+}
+
+function metaFieldsFromKnown(
+  existing?: KnownItem,
+): Pick<FaxItem, 'priority' | 'note' | 'tags'> {
+  return {
+    priority: existing?.priority === true,
+    note: normalizeNote(existing?.note ?? null),
+    tags: normalizeTags(existing?.tags),
+  }
 }
 
 function printFieldsFromKnown(existing?: KnownItem): Pick<FaxItem, 'printStatus' | 'printedAt'> {
@@ -133,6 +153,7 @@ export class FaxWatcher {
   private callbacks: WatcherCallbacks
   private rescanTimer: ReturnType<typeof setInterval> | null = null
   private stateSyncTimer: ReturnType<typeof setInterval> | null = null
+  private autoArchiveTimer: ReturnType<typeof setInterval> | null = null
   private lastStateMtimeMs = 0
   private writingState = false
 
@@ -178,17 +199,35 @@ export class FaxWatcher {
     return this.getUsers()
   }
 
-  /** Assign fax to a shared user, or null to clear assignment. */
+  /** Assign document to a shared user, or null to clear assignment. */
   assignFax(filePath: string, userName: string | null): FaxItem[] {
+    this.applyAssign(filePath, userName)
+    this.persist()
+    this.emit()
+    return this.getItems()
+  }
+
+  assignMany(filePaths: string[], userName: string | null): FaxItem[] {
+    for (const p of filePaths) {
+      try {
+        this.applyAssign(p, userName)
+      } catch {
+        /* skip missing */
+      }
+    }
+    this.persist()
+    this.emit()
+    return this.getItems()
+  }
+
+  private applyAssign(filePath: string, userName: string | null): void {
     const item = this.items.get(this.key(filePath))
     if (!item) throw new Error('Eintrag nicht gefunden')
 
     if (userName === null || userName.trim() === '') {
       item.assignedTo = null
       item.assignedAt = null
-      this.persist()
-      this.emit()
-      return this.getItems()
+      return
     }
 
     const trimmed = userName.trim()
@@ -196,9 +235,113 @@ export class FaxWatcher {
     if (!match) throw new Error('Unbekannter Benutzer. Bitte zuerst in den Einstellungen anlegen.')
     item.assignedTo = match
     item.assignedAt = new Date().toISOString()
+  }
+
+  setPriority(filePath: string, priority: boolean): FaxItem[] {
+    const item = this.items.get(this.key(filePath))
+    if (!item) throw new Error('Eintrag nicht gefunden')
+    item.priority = priority === true
     this.persist()
     this.emit()
     return this.getItems()
+  }
+
+  setPriorityMany(filePaths: string[], priority: boolean): FaxItem[] {
+    for (const p of filePaths) {
+      const item = this.items.get(this.key(p))
+      if (item) item.priority = priority === true
+    }
+    this.persist()
+    this.emit()
+    return this.getItems()
+  }
+
+  setNote(filePath: string, note: string | null): FaxItem[] {
+    const item = this.items.get(this.key(filePath))
+    if (!item) throw new Error('Eintrag nicht gefunden')
+    item.note = normalizeNote(note)
+    this.persist()
+    this.emit()
+    return this.getItems()
+  }
+
+  setTags(filePath: string, tags: string[]): FaxItem[] {
+    const item = this.items.get(this.key(filePath))
+    if (!item) throw new Error('Eintrag nicht gefunden')
+    item.tags = normalizeTags(tags)
+    this.persist()
+    this.emit()
+    return this.getItems()
+  }
+
+  setTagsMany(filePaths: string[], tags: string[], mode: 'replace' | 'add' = 'add'): FaxItem[] {
+    const nextTags = normalizeTags(tags)
+    for (const p of filePaths) {
+      const item = this.items.get(this.key(p))
+      if (!item) continue
+      if (mode === 'replace') {
+        item.tags = nextTags
+      } else {
+        item.tags = normalizeTags([...item.tags, ...nextTags])
+      }
+    }
+    this.persist()
+    this.emit()
+    return this.getItems()
+  }
+
+  archiveMany(filePaths: string[]): FaxItem[] {
+    for (const p of filePaths) {
+      try {
+        const item = this.items.get(this.key(p))
+        if (item && !item.archived) this.archive(p)
+      } catch (err) {
+        console.error('Stapel-Archiv fehlgeschlagen:', err)
+      }
+    }
+    return this.getItems()
+  }
+
+  /** Delete without UI confirm — caller must confirm once for batches. */
+  removeMany(filePaths: string[]): FaxItem[] {
+    for (const p of filePaths) {
+      const k = this.key(p)
+      const item = this.items.get(k)
+      if (!item) continue
+      this.items.delete(k)
+      try {
+        if (fs.existsSync(item.path)) fs.unlinkSync(item.path)
+      } catch (err) {
+        console.error('Stapel-Löschen fehlgeschlagen:', err)
+      }
+    }
+    this.persist()
+    this.emit()
+    return this.getItems()
+  }
+
+  /** Archive seen, non-archived items older than settings threshold. */
+  runAutoArchive(): number {
+    const settings = loadSettings()
+    if (!settings.autoArchiveEnabled) return 0
+    const days = settings.autoArchiveAfterDays
+    const cutoff = Date.now() - days * 86_400_000
+    const candidates = this.getItems().filter(
+      (i) =>
+        !i.archived &&
+        i.seenAt != null &&
+        new Date(i.addedAt).getTime() < cutoff,
+    )
+    let count = 0
+    for (const item of candidates) {
+      try {
+        this.archive(item.path)
+        count += 1
+      } catch (err) {
+        console.error('Auto-Archiv fehlgeschlagen:', err)
+      }
+    }
+    return count
   }
 
   private key(filePath: string): string {
@@ -331,6 +474,11 @@ export class FaxWatcher {
       this.reloadSharedStateIfChanged()
     }, 2000)
     this.touchStateMtime()
+
+    this.runAutoArchive()
+    this.autoArchiveTimer = setInterval(() => {
+      this.runAutoArchive()
+    }, 5 * 60_000)
   }
 
   stop(): void {
@@ -341,6 +489,10 @@ export class FaxWatcher {
     if (this.stateSyncTimer) {
       clearInterval(this.stateSyncTimer)
       this.stateSyncTimer = null
+    }
+    if (this.autoArchiveTimer) {
+      clearInterval(this.autoArchiveTimer)
+      this.autoArchiveTimer = null
     }
     if (this.watcher) {
       void this.watcher.close()
@@ -428,7 +580,7 @@ export class FaxWatcher {
     if (item.archived) return { items: this.getItems(), path: item.path }
 
     const root = this.findRoot(item.path)
-    if (!root) throw new Error('Kein Faxordner für diese Datei')
+    if (!root) throw new Error('Kein Eingangsordner für diese Datei')
 
     const destDir = archiveDir(root)
     fs.mkdirSync(destDir, { recursive: true })
@@ -456,7 +608,7 @@ export class FaxWatcher {
     if (!item.archived) return { items: this.getItems(), path: item.path }
 
     const root = this.findRoot(item.path)
-    if (!root) throw new Error('Kein Faxordner für diese Datei')
+    if (!root) throw new Error('Kein Eingangsordner für diese Datei')
 
     const dest = uniqueTarget(root, item.name)
     fs.renameSync(item.path, dest)
@@ -530,6 +682,7 @@ export class FaxWatcher {
         ...printFieldsFromKnown(existing),
         ...exportFieldsFromKnown(existing),
         ...assignmentFieldsFromKnown(existing),
+        ...metaFieldsFromKnown(existing),
       })
     }
   }
@@ -583,6 +736,9 @@ export class FaxWatcher {
           exportedAt: null,
           assignedTo: null,
           assignedAt: null,
+          priority: false,
+          note: null,
+          tags: [],
         }
         this.items.set(k, item)
         changed = true
@@ -629,6 +785,9 @@ export class FaxWatcher {
       exportedAt: null,
       assignedTo: null,
       assignedAt: null,
+      priority: false,
+      note: null,
+      tags: [],
     }
     this.items.set(k, item)
     this.persist()
@@ -660,6 +819,9 @@ export class FaxWatcher {
             exportedAt,
             assignedTo,
             assignedAt,
+            priority,
+            note,
+            tags,
           }) => ({
             path: p,
             addedAt,
@@ -671,6 +833,9 @@ export class FaxWatcher {
             exportedAt,
             assignedTo,
             assignedAt,
+            priority,
+            note,
+            tags,
           }),
         ),
       })
@@ -756,6 +921,22 @@ export class FaxWatcher {
         ) {
           item.assignedTo = assignment.assignedTo
           item.assignedAt = assignment.assignedAt
+          changed = true
+        }
+
+        const meta = metaFieldsFromKnown(known)
+        if (item.priority !== meta.priority) {
+          item.priority = meta.priority
+          changed = true
+        }
+        if (item.note !== meta.note) {
+          item.note = meta.note
+          changed = true
+        }
+        const tagsKey = (item.tags ?? []).join('\0')
+        const nextTagsKey = meta.tags.join('\0')
+        if (tagsKey !== nextTagsKey) {
+          item.tags = meta.tags
           changed = true
         }
 
