@@ -31,12 +31,10 @@ type Props = {
   onConsumedFocusPath: () => void
 }
 
-const BUCKET_ORDER: DayBucket[] = ['heute', 'gestern', 'vorgestern', 'spaeter']
-const BUCKET_LABEL: Record<DayBucket, string> = {
+const BUCKET_LABEL: Record<Exclude<DayBucket, 'spaeter'>, string> = {
   heute: 'Heute',
   gestern: 'Gestern',
   vorgestern: 'Vorgestern',
-  spaeter: 'Später',
 }
 
 const EMPTY_FILTERS: ListFilters = {
@@ -69,17 +67,73 @@ function sortGroupItems(items: FaxItem[]): FaxItem[] {
   })
 }
 
-function groupByDay(items: FaxItem[]): Array<{ key: DayBucket; label: string; items: FaxItem[] }> {
-  const buckets = new Map<DayBucket, FaxItem[]>()
-  for (const key of BUCKET_ORDER) buckets.set(key, [])
-  for (const item of items) {
-    buckets.get(bucketFor(item.addedAt))!.push(item)
+function localDayKey(iso: string): string {
+  const d = new Date(iso)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Banner for older-than-vorgestern days, e.g. "Mo., 07.10.2026" */
+function formatDayBanner(iso: string): string {
+  return new Intl.DateTimeFormat('de-DE', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(iso))
+}
+
+type ListGroup = {
+  key: string
+  label: string
+  bucket: DayBucket
+  items: FaxItem[]
+}
+
+function groupByDay(items: FaxItem[]): ListGroup[] {
+  const recent = new Map<DayBucket, FaxItem[]>()
+  for (const key of ['heute', 'gestern', 'vorgestern'] as const) {
+    recent.set(key, [])
   }
-  return BUCKET_ORDER.map((key) => ({
-    key,
-    label: BUCKET_LABEL[key],
-    items: sortGroupItems(buckets.get(key)!),
-  })).filter((g) => g.items.length > 0)
+  const olderByDay = new Map<string, FaxItem[]>()
+
+  for (const item of items) {
+    const bucket = bucketFor(item.addedAt)
+    if (bucket !== 'spaeter') {
+      recent.get(bucket)!.push(item)
+      continue
+    }
+    const dayKey = localDayKey(item.addedAt)
+    const list = olderByDay.get(dayKey)
+    if (list) list.push(item)
+    else olderByDay.set(dayKey, [item])
+  }
+
+  const out: ListGroup[] = []
+  for (const key of ['heute', 'gestern', 'vorgestern'] as const) {
+    const list = recent.get(key)!
+    if (list.length === 0) continue
+    out.push({
+      key,
+      label: BUCKET_LABEL[key],
+      bucket: key,
+      items: sortGroupItems(list),
+    })
+  }
+
+  const olderKeys = [...olderByDay.keys()].sort((a, b) => b.localeCompare(a))
+  for (const dayKey of olderKeys) {
+    const list = olderByDay.get(dayKey)!
+    out.push({
+      key: `day-${dayKey}`,
+      label: formatDayBanner(list[0].addedAt),
+      bucket: 'spaeter',
+      items: sortGroupItems(list),
+    })
+  }
+  return out
 }
 
 function formatWhen(iso: string, bucket: DayBucket): string {
@@ -1049,7 +1103,7 @@ export default function Inbox({
                               </span>
                             ) : null}
                             <span className="item-meta" title={`Empfangen ${formatPrintedAt(item.addedAt)}`}>
-                              {formatWhen(item.addedAt, group.key)}
+                              {formatWhen(item.addedAt, group.bucket)}
                             </span>
                           </span>
                           <span className="file-status" aria-hidden={false}>
@@ -1103,13 +1157,22 @@ export default function Inbox({
                               ) : null}
                             </span>
                             {item.note ? (
-                              <span
-                                className="file-status-row is-note"
+                              <button
+                                type="button"
+                                className="file-status-row is-note note-open-btn"
                                 title={item.note}
-                                aria-label={`Notiz: ${item.note}`}
+                                aria-label={`Notiz öffnen: ${item.note}`}
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  void (async () => {
+                                    await selectItem(item)
+                                    setNoteEditing(true)
+                                  })()
+                                }}
                               >
                                 <PostItIcon />
-                              </span>
+                              </button>
                             ) : null}
                           </span>
                         </button>
@@ -1138,7 +1201,13 @@ export default function Inbox({
                   <FlagIcon filled={!!selectedVisible.priority} />
                   Priorität
                 </button>
-                <button type="button" className="btn btn-ghost" onClick={() => setNoteEditing(true)}>
+                <button
+                  type="button"
+                  className={`btn btn-ghost ${selectedVisible.note ? 'is-note-active' : ''}`}
+                  title={selectedVisible.note ? selectedVisible.note : 'Notiz hinzufügen'}
+                  onClick={() => setNoteEditing(true)}
+                >
+                  <PostItIcon />
                   Notiz
                 </button>
                 <button

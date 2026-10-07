@@ -3,7 +3,9 @@ import { autoUpdater } from 'electron-updater'
 import { loadSettings } from './store'
 import type { UpdateStatusEvent } from '../shared/types'
 import {
+  BRIDGE_DEB_TAG,
   downloadDebUpdate,
+  fetchDebReleaseByTag,
   fetchLatestDebRelease,
   isVersionNewer,
   quitAndInstallDeb,
@@ -65,16 +67,64 @@ function shouldAutoCheck(): boolean {
   }
 }
 
+/**
+ * When the newest GitHub release has no installable .deb (e.g. renamed assets),
+ * offer the known bridge release (0.4.0) so users can step up, then update cleanly.
+ */
+async function offerBridgeDebIfWanted(): Promise<DebReleaseInfo | null> {
+  const current = app.getVersion()
+  const bridgeVersion = BRIDGE_DEB_TAG.replace(/^v/i, '')
+  if (!isVersionNewer(bridgeVersion, current)) {
+    emit({
+      type: 'error',
+      message:
+        'Kein .deb-Paket im neuesten GitHub-Release gefunden. Bitte das Paket manuell von GitHub Releases installieren.',
+    })
+    return null
+  }
+
+  const win = getMainWindow()
+  const boxOpts = {
+    type: 'question' as const,
+    buttons: ['0.4.0 installieren', 'Abbrechen'],
+    defaultId: 0,
+    cancelId: 1,
+    title: 'Update-Zwischenschritt',
+    message: 'Im neuesten Release wurde kein passendes .deb-Paket gefunden.',
+    detail:
+      'Als Zwischenschritt kann Version 0.4.0 installiert werden. Danach funktionieren weitere Updates mit dem Paketnamen „Inbox“ (ohne „Fax“ im Dateinamen).\n\nJetzt 0.4.0 herunterladen und installieren?',
+    noLink: true,
+  }
+  const { response } =
+    win && !win.isDestroyed()
+      ? await dialog.showMessageBox(win, boxOpts)
+      : await dialog.showMessageBox(boxOpts)
+  if (response !== 0) {
+    emit({
+      type: 'error',
+      message: 'Update abgebrochen — kein .deb im neuesten Release.',
+    })
+    return null
+  }
+
+  const bridge = await fetchDebReleaseByTag(BRIDGE_DEB_TAG)
+  if (!bridge) {
+    emit({
+      type: 'error',
+      message: `Zwischenschritt ${BRIDGE_DEB_TAG} hat ebenfalls kein .deb-Paket.`,
+    })
+    return null
+  }
+  return bridge
+}
+
 async function checkDebUpdates(): Promise<void> {
   emit({ type: 'checking' })
   try {
-    const latest = await fetchLatestDebRelease()
+    let latest = await fetchLatestDebRelease()
     if (!latest) {
-      emit({
-        type: 'error',
-        message: 'Kein .deb-Paket im neuesten GitHub-Release gefunden.',
-      })
-      return
+      latest = await offerBridgeDebIfWanted()
+      if (!latest) return
     }
     const current = app.getVersion()
     if (isVersionNewer(latest.version, current)) {

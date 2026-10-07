@@ -1,6 +1,6 @@
 {
   "name": "fax-inbox",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Inbox – Desktop-Inbox für eingehende PDFs (Fax, Scans, Anhänge)",
   "main": "dist-electron/main.js",
   "homepage": "https://github.com/AniGerm/Inbox",
@@ -70,7 +70,7 @@
         "nsis"
       ],
       "icon": "resources/icon.ico",
-      "artifactName": "Fax-Inbox-Setup-${version}.${ext}",
+      "artifactName": "Inbox-Setup-${version}.${ext}",
       "signAndEditExecutable": false
     },
     "nsis": {
@@ -110,7 +110,7 @@
         "Terminal": "false",
         "Type": "Application"
       },
-      "artifactName": "Fax-Inbox-${version}.${ext}"
+      "artifactName": "Inbox-${version}.${ext}"
     },
     "deb": {
       "packageCategory": "office",
@@ -132,7 +132,7 @@
       "afterInstall": "build/linux/after-install.sh"
     },
     "appImage": {
-      "artifactName": "Fax-Inbox-${version}.AppImage"
+      "artifactName": "Inbox-${version}.AppImage"
     },
     "asarUnpack": [
       "node_modules/pdf-to-printer/**"

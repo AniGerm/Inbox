@@ -131,21 +131,41 @@ function downloadFile(
   })
 }
 
-export async function fetchLatestDebRelease(): Promise<DebReleaseInfo | null> {
-  const release = await httpsGetJson<GithubRelease>(
-    `https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`,
+/** Prefer clean Inbox-*.deb; accept legacy Fax-Inbox-*.deb as fallback. */
+function findDebAsset(assets: GithubAsset[] | undefined): GithubAsset | undefined {
+  const list = assets ?? []
+  return (
+    list.find((a) => /^Inbox-.*\.deb$/i.test(a.name)) ??
+    list.find((a) => /^Fax-Inbox-.*\.deb$/i.test(a.name))
   )
-  const version = release.tag_name.replace(/^v/i, '')
-  const asset = (release.assets || []).find(
-    (a) => /^(Inbox|Fax-Inbox)-.*\.deb$/i.test(a.name),
-  )
+}
+
+function releaseToDebInfo(release: GithubRelease): DebReleaseInfo | null {
+  const asset = findDebAsset(release.assets)
   if (!asset) return null
   return {
-    version,
+    version: release.tag_name.replace(/^v/i, ''),
     debUrl: asset.browser_download_url,
     debName: asset.name,
     size: asset.size,
   }
+}
+
+export async function fetchLatestDebRelease(): Promise<DebReleaseInfo | null> {
+  const release = await httpsGetJson<GithubRelease>(
+    `https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`,
+  )
+  return releaseToDebInfo(release)
+}
+
+/** Bridge release for clients that cannot see newer Inbox-*.deb assets. */
+export const BRIDGE_DEB_TAG = 'v0.4.0'
+
+export async function fetchDebReleaseByTag(tag: string): Promise<DebReleaseInfo | null> {
+  const release = await httpsGetJson<GithubRelease>(
+    `https://api.github.com/repos/${OWNER}/${REPO}/releases/tags/${encodeURIComponent(tag)}`,
+  )
+  return releaseToDebInfo(release)
 }
 
 export function debDownloadPath(debName: string): string {
