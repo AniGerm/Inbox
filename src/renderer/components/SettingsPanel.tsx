@@ -583,15 +583,16 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
             Gelesene Dokumente, die älter als die gewählte Anzahl Tage sind, werden automatisch in
             den Archiv-Ordner verschoben (beim Start und alle 5 Minuten).
           </p>
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={autoArchiveEnabled}
-              onChange={(e) => setAutoArchiveEnabled(e.target.checked)}
+          <div className="toggle-row" style={{ borderTop: 'none', paddingTop: 0 }}>
+            <span>Auto-Archiv aktiv</span>
+            <button
+              type="button"
+              className={`toggle ${autoArchiveEnabled ? 'is-on' : ''}`}
+              aria-pressed={autoArchiveEnabled}
+              onClick={() => setAutoArchiveEnabled((v) => !v)}
               aria-labelledby="auto-archive-label"
             />
-            <span>Auto-Archiv aktiv</span>
-          </label>
+          </div>
           <label htmlFor="auto-archive-days" style={{ marginTop: 10 }}>
             Nach Tagen (gelesen)
           </label>
