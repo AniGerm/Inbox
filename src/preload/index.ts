@@ -36,6 +36,11 @@ const api = {
   restoreFax: (filePath: string): Promise<PathResult> => ipcRenderer.invoke('restore-fax', filePath),
   renameFax: (filePath: string, newName: string): Promise<PathResult> =>
     ipcRenderer.invoke('rename-fax', filePath, newName),
+  assignFax: (filePath: string, userName: string | null): Promise<FaxItem[]> =>
+    ipcRenderer.invoke('assign-fax', filePath, userName),
+  getUsers: (): Promise<string[]> => ipcRenderer.invoke('get-users'),
+  addUser: (name: string): Promise<string[]> => ipcRenderer.invoke('add-user', name),
+  removeUser: (name: string): Promise<string[]> => ipcRenderer.invoke('remove-user', name),
   printPreview: (filePath?: string): Promise<boolean> =>
     ipcRenderer.invoke('print-preview', filePath),
   listPrinters: (): Promise<PrinterInfo[]> => ipcRenderer.invoke('list-printers'),

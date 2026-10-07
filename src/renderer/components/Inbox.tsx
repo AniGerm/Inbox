@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ExportStatus, FaxItem, PrintStatus } from '../../shared/types'
+import type { AppMode, ExportStatus, FaxItem, PrintStatus } from '../../shared/types'
 import PdfPreview from './PdfPreview'
 import RenameDialog from './RenameDialog'
+import AssignDialog from './AssignDialog'
 
 type ViewMode = 'inbox' | 'archive'
 type DayBucket = 'heute' | 'gestern' | 'vorgestern' | 'spaeter'
@@ -13,6 +14,8 @@ type Props = {
   faxFolders?: string[]
   exportButtonLabel: string
   exportFolder: string | null
+  appMode: AppMode
+  clientUserName: string | null
   focusPath: string | null
   focusNewestToken: number
   onOpenSettings: () => void
@@ -253,6 +256,33 @@ function ExportStatusIcon({ status }: { status: ExportStatus }) {
   return <StorageIcon slashed />
 }
 
+/** Person / user glyph — slashed = not assigned */
+function UserIcon({ slashed = false }: { slashed?: boolean }) {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M5 19.5c1.2-3.2 3.5-4.8 7-4.8s5.8 1.6 7 4.8"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      {slashed ? (
+        <path d="M4 20 20 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      ) : null}
+    </svg>
+  )
+}
+
+function assignmentStatusLabel(item: FaxItem): string {
+  if (item.assignedTo) {
+    return item.assignedAt
+      ? `Zugewiesen an ${item.assignedTo} · ${formatPrintedAt(item.assignedAt)}`
+      : `Zugewiesen an ${item.assignedTo}`
+  }
+  return 'Nicht zugewiesen'
+}
+
 export default function Inbox({
   items,
   unreadCount,
@@ -260,6 +290,8 @@ export default function Inbox({
   faxFolders,
   exportButtonLabel,
   exportFolder,
+  appMode,
+  clientUserName,
   focusPath,
   focusNewestToken,
   onOpenSettings,
@@ -269,17 +301,33 @@ export default function Inbox({
   const [view, setView] = useState<ViewMode>('inbox')
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [renaming, setRenaming] = useState(false)
+  const [assigning, setAssigning] = useState(false)
+  const [assignUsers, setAssignUsers] = useState<string[]>([])
   const [exporting, setExporting] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
 
+  const isReception = appMode !== 'recipient'
+  const recipientName = clientUserName?.trim() || null
+
+  const roleFiltered = useMemo(() => {
+    if (isReception) return items
+    if (!recipientName) return []
+    return items.filter((i) => i.assignedTo === recipientName)
+  }, [items, isReception, recipientName])
+
   const visible = useMemo(
-    () => items.filter((i) => (view === 'archive' ? i.archived : !i.archived)),
-    [items, view],
+    () => roleFiltered.filter((i) => (view === 'archive' ? i.archived : !i.archived)),
+    [roleFiltered, view],
   )
+
+  const displayUnread = useMemo(() => {
+    if (isReception) return unreadCount
+    return roleFiltered.filter((i) => !i.archived && i.seenAt === null).length
+  }, [isReception, unreadCount, roleFiltered])
 
   const groups = useMemo(() => groupByDay(visible), [visible])
 
-  const selected = items.find((i) => i.path === selectedPath) ?? null
+  const selected = roleFiltered.find((i) => i.path === selectedPath) ?? null
   const selectedVisible = selected && visible.some((i) => i.path === selected.path) ? selected : null
 
   useEffect(() => {
@@ -303,7 +351,7 @@ export default function Inbox({
 
   useEffect(() => {
     if (!focusPath) return
-    const target = items.find((i) => i.path === focusPath)
+    const target = roleFiltered.find((i) => i.path === focusPath)
     if (target) {
       setView(target.archived ? 'archive' : 'inbox')
       void selectItem(target)
@@ -314,12 +362,12 @@ export default function Inbox({
       })
     }
     onConsumedFocusPath()
-  }, [focusPath, items, onConsumedFocusPath, selectItem])
+  }, [focusPath, roleFiltered, onConsumedFocusPath, selectItem])
 
   useEffect(() => {
     if (focusNewestToken <= 0) return
     setView('inbox')
-    const newest = items.find((i) => !i.archived)
+    const newest = roleFiltered.find((i) => !i.archived)
     if (newest) void selectItem(newest)
     // Only react to tray/focus-newest signals — NOT to every items update
     // (otherwise markUnseen would immediately get marked seen again).
@@ -373,17 +421,26 @@ export default function Inbox({
     }
   }, [selectedVisible, exportFolder, onOpenSettings, onItemsChange])
 
+  const applyRoleFilter = useCallback(
+    (list: FaxItem[]) => {
+      if (isReception) return list
+      if (!recipientName) return []
+      return list.filter((i) => i.assignedTo === recipientName)
+    },
+    [isReception, recipientName],
+  )
+
   const remove = useCallback(async () => {
     if (!selectedVisible) return
     const result = await window.faxInbox.deleteFax(selectedVisible.path)
     if (result.deleted) {
       onItemsChange(result.items)
-      const nextVisible = result.items.filter((i) =>
+      const nextVisible = applyRoleFilter(result.items).filter((i) =>
         view === 'archive' ? i.archived : !i.archived,
       )
       setSelectedPath(nextVisible[0]?.path ?? null)
     }
-  }, [selectedVisible, onItemsChange, view])
+  }, [selectedVisible, onItemsChange, view, applyRoleFilter])
 
   const archiveOrRestore = useCallback(async () => {
     if (!selectedVisible) return
@@ -392,14 +449,14 @@ export default function Inbox({
         ? await window.faxInbox.restoreFax(selectedVisible.path)
         : await window.faxInbox.archiveFax(selectedVisible.path)
       onItemsChange(result.items)
-      const nextVisible = result.items.filter((i) =>
+      const nextVisible = applyRoleFilter(result.items).filter((i) =>
         view === 'archive' ? i.archived : !i.archived,
       )
       setSelectedPath(nextVisible[0]?.path ?? null)
     } catch (err) {
       console.error(err)
     }
-  }, [selectedVisible, onItemsChange, view])
+  }, [selectedVisible, onItemsChange, view, applyRoleFilter])
 
   const toggleSeen = useCallback(async () => {
     if (!selectedVisible) return
@@ -421,9 +478,34 @@ export default function Inbox({
     [selectedVisible, onItemsChange],
   )
 
+  const openAssign = useCallback(async () => {
+    if (!selectedVisible || !isReception) return
+    try {
+      const list =
+        typeof window.faxInbox.getUsers === 'function'
+          ? await window.faxInbox.getUsers()
+          : []
+      setAssignUsers(list)
+    } catch (err) {
+      console.error(err)
+      setAssignUsers([])
+    }
+    setAssigning(true)
+  }, [selectedVisible, isReception])
+
+  const handleAssign = useCallback(
+    async (userName: string | null) => {
+      if (!selectedVisible) return
+      const next = await window.faxInbox.assignFax(selectedVisible.path, userName)
+      onItemsChange(next)
+      setAssigning(false)
+    },
+    [selectedVisible, onItemsChange],
+  )
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (renaming) return
+      if (renaming || assigning) return
       const target = e.target as HTMLElement | null
       const tag = target?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return
@@ -461,11 +543,11 @@ export default function Inbox({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [visible, selectedVisible, selectedPath, print, remove, selectItem, renaming])
+  }, [visible, selectedVisible, selectedPath, print, remove, selectItem, renaming, assigning])
 
   const switchView = (mode: ViewMode) => {
     setView(mode)
-    const list = items.filter((i) => (mode === 'archive' ? i.archived : !i.archived))
+    const list = roleFiltered.filter((i) => (mode === 'archive' ? i.archived : !i.archived))
     setSelectedPath(list[0]?.path ?? null)
   }
 
@@ -473,9 +555,9 @@ export default function Inbox({
     <div className="app">
       <header className="topbar">
         <h1 className="brand">Fax Inbox</h1>
-        {unreadCount > 0 && (
+        {displayUnread > 0 && (
           <span className="unread-pill">
-            {unreadCount === 1 ? '1 ungelesen' : `${unreadCount} ungelesen`}
+            {displayUnread === 1 ? '1 ungelesen' : `${displayUnread} ungelesen`}
           </span>
         )}
         <div className="topbar-spacer" />
@@ -527,8 +609,16 @@ export default function Inbox({
           <div className="list-scroll" ref={listRef} role="listbox" aria-label="Faxliste">
             {visible.length === 0 ? (
               <div className="empty" style={{ paddingTop: 40 }}>
-                <p>{view === 'archive' ? 'Archiv ist leer.' : 'Noch keine Faxe.'}</p>
-                {view === 'inbox' && (
+                <p>
+                  {view === 'archive'
+                    ? 'Archiv ist leer.'
+                    : !isReception && !recipientName
+                      ? 'Kein Benutzer gewählt. Bitte in den Einstellungen „Dieser Client ist“ festlegen.'
+                      : !isReception
+                        ? `Keine zugewiesenen Faxe für ${recipientName}.`
+                        : 'Noch keine Faxe.'}
+                </p>
+                {view === 'inbox' && isReception && (
                   <p className="path" title={(faxFolders ?? [faxFolder]).join('\n')}>
                     Überwacht: {faxFolder}
                   </p>
@@ -547,6 +637,7 @@ export default function Inbox({
                     const exportStatus: ExportStatus = item.exportStatus ?? 'none'
                     const printLabel = printStatusLabel(item)
                     const exportLabel = exportStatusLabel(item)
+                    const assignLabel = assignmentStatusLabel(item)
                     const printedShort =
                       printStatus === 'printed' && item.printedAt
                         ? formatPrintedAtShort(item.printedAt)
@@ -555,6 +646,12 @@ export default function Inbox({
                       exportStatus === 'exported' && item.exportedAt
                         ? formatPrintedAtShort(item.exportedAt)
                         : null
+                    const assignedShort =
+                      item.assignedTo && item.assignedAt
+                        ? formatPrintedAtShort(item.assignedAt)
+                        : item.assignedTo
+                          ? item.assignedTo
+                          : null
                     return (
                       <button
                         key={item.path}
@@ -595,6 +692,25 @@ export default function Inbox({
                                   <StorageIcon />
                                 </span>
                                 <span className="file-status-time">{exportedShort}</span>
+                              </span>
+                            ) : null}
+                          </span>
+                          <span
+                            className={`file-status-row ${item.assignedTo ? 'is-assigned' : 'is-unassigned'}`}
+                            title={assignLabel}
+                            aria-label={assignLabel}
+                          >
+                            {item.assignedTo ? <UserIcon /> : <UserIcon slashed />}
+                            {assignedShort ? (
+                              <span className="file-status-meta">
+                                <span className="file-status-glyph" aria-hidden>
+                                  <UserIcon />
+                                </span>
+                                <span className="file-status-time">
+                                  {item.assignedTo && item.assignedAt
+                                    ? `${item.assignedTo} · ${assignedShort}`
+                                    : assignedShort}
+                                </span>
                               </span>
                             ) : null}
                           </span>
@@ -651,6 +767,20 @@ export default function Inbox({
                     ? 'Kopiere…'
                     : exportButtonLabel.trim() || 'In Ordner kopieren'}
                 </button>
+                {isReception ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    title={
+                      selectedVisible.assignedTo
+                        ? `Zugewiesen an ${selectedVisible.assignedTo}`
+                        : 'Nutzer zuweisen'
+                    }
+                    onClick={() => void openAssign()}
+                  >
+                    Nutzer zuweisen
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="btn btn-ghost btn-danger"
@@ -667,9 +797,13 @@ export default function Inbox({
               <p>
                 {view === 'archive'
                   ? 'Archivierte Faxe erscheinen hier nach dem Archivieren.'
-                  : 'Wähle ein Fax links, oder warte auf neue PDFs im überwachten Ordner.'}
+                  : !isReception && !recipientName
+                    ? 'In den Einstellungen Modus Empfänger und Benutzer wählen.'
+                    : !isReception
+                      ? 'Sobald der Empfang ein Fax zuweist, erscheint es hier.'
+                      : 'Wähle ein Fax links, oder warte auf neue PDFs im überwachten Ordner.'}
               </p>
-              <p className="path">{faxFolder}</p>
+              {isReception ? <p className="path">{faxFolder}</p> : null}
             </div>
           )}
         </section>
@@ -680,6 +814,14 @@ export default function Inbox({
           currentName={selectedVisible.name}
           onCancel={() => setRenaming(false)}
           onConfirm={(name) => void handleRename(name)}
+        />
+      )}
+      {assigning && selectedVisible && isReception && (
+        <AssignDialog
+          currentAssignee={selectedVisible.assignedTo}
+          users={assignUsers}
+          onCancel={() => setAssigning(false)}
+          onAssign={(userName) => void handleAssign(userName)}
         />
       )}
     </div>

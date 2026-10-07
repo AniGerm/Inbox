@@ -189,12 +189,22 @@ export default function App() {
         faxFolders={watchedFolders}
         exportButtonLabel={settings.exportButtonLabel || 'In Ordner kopieren'}
         exportFolder={settings.exportFolder}
+        appMode={settings.appMode === 'recipient' ? 'recipient' : 'reception'}
+        clientUserName={settings.clientUserName}
         focusPath={focusPath}
         focusNewestToken={focusNewestToken}
         onOpenSettings={() => setShowSettings(true)}
         onItemsChange={(next) => {
           setItems(next)
-          setUnreadCount(next.filter((i) => !i.archived && i.seenAt === null).length)
+          const mode = settings.appMode === 'recipient' ? 'recipient' : 'reception'
+          const name = settings.clientUserName?.trim()
+          const scoped =
+            mode === 'recipient'
+              ? name
+                ? next.filter((i) => i.assignedTo === name)
+                : []
+              : next
+          setUnreadCount(scoped.filter((i) => !i.archived && i.seenAt === null).length)
         }}
         onConsumedFocusPath={() => setFocusPath(null)}
       />

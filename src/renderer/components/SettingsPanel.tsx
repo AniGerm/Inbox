@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type {
+  AppMode,
   AppSettings,
   DuplexMode,
   PrintMethod,
@@ -114,6 +115,14 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
       : 'In Ordner kopieren',
   )
   const [stateFolder, setStateFolder] = useState(settings.stateFolder ?? '')
+  const [appMode, setAppMode] = useState<AppMode>(
+    settings.appMode === 'recipient' ? 'recipient' : 'reception',
+  )
+  const [clientUserName, setClientUserName] = useState(settings.clientUserName ?? '')
+  const [users, setUsers] = useState<string[]>([])
+  const [newUserName, setNewUserName] = useState('')
+  const [usersBusy, setUsersBusy] = useState(false)
+  const [usersError, setUsersError] = useState<string | null>(null)
   const [printMethod, setPrintMethod] = useState<PrintMethod>(
     settings.printMethod === 'direct' ? 'direct' : 'external',
   )
@@ -164,6 +173,62 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
       void window.faxInbox.getAppVersion().then(setAppVersion)
     }
   }, [])
+
+  const refreshUsers = useCallback(async () => {
+    if (typeof window.faxInbox.getUsers !== 'function') {
+      setUsers([])
+      return
+    }
+    try {
+      const list = await window.faxInbox.getUsers()
+      setUsers(list)
+      setClientUserName((current) => {
+        if (!current.trim()) return current
+        const match = list.find((u) => u.toLowerCase() === current.trim().toLowerCase())
+        return match ?? ''
+      })
+    } catch (err) {
+      console.error(err)
+      setUsers([])
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshUsers()
+  }, [refreshUsers])
+
+  const addUser = async () => {
+    const name = newUserName.trim()
+    if (!name || typeof window.faxInbox.addUser !== 'function') return
+    setUsersBusy(true)
+    setUsersError(null)
+    try {
+      const list = await window.faxInbox.addUser(name)
+      setUsers(list)
+      setNewUserName('')
+    } catch (err) {
+      setUsersError(err instanceof Error ? err.message : 'Benutzer konnte nicht angelegt werden.')
+    } finally {
+      setUsersBusy(false)
+    }
+  }
+
+  const removeUser = async (name: string) => {
+    if (typeof window.faxInbox.removeUser !== 'function') return
+    setUsersBusy(true)
+    setUsersError(null)
+    try {
+      const list = await window.faxInbox.removeUser(name)
+      setUsers(list)
+      setClientUserName((current) =>
+        current.trim().toLowerCase() === name.toLowerCase() ? '' : current,
+      )
+    } catch (err) {
+      setUsersError(err instanceof Error ? err.message : 'Benutzer konnte nicht entfernt werden.')
+    } finally {
+      setUsersBusy(false)
+    }
+  }
 
   useEffect(() => {
     if (printMethod === 'direct' && (platform === 'win32' || platform === 'linux')) {
@@ -242,6 +307,9 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
         exportFolder: exportFolder.trim() || null,
         exportButtonLabel: exportButtonLabel.trim() || 'In Ordner kopieren',
         stateFolder: stateFolder.trim() || null,
+        appMode,
+        clientUserName:
+          appMode === 'recipient' ? clientUserName.trim() || null : clientUserName.trim() || null,
         printMethod: method,
         printerName: printerName.trim(),
         duplex,
@@ -361,9 +429,9 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
             Status-Datenbank (Multi-Client)
           </span>
           <p className="field-hint">
-            Gemeinsamer Ordner für <strong>gelesen / gedruckt / exportiert</strong> (Datei{' '}
-            <code>inbox-state.json</code>). Alle PCs wählen denselben Netzwerkordner — dann sind
-            Marker und Uhrzeiten überall synchron. Leer = nur lokal auf diesem PC.
+            Gemeinsamer Ordner für <strong>gelesen / gedruckt / exportiert / Zuweisung / Benutzer</strong>{' '}
+            (Datei <code>inbox-state.json</code>). Alle PCs wählen denselben Netzwerkordner — dann sind
+            Marker, Benutzerliste und Zuweisungen überall synchron. Leer = nur lokal auf diesem PC.
           </p>
           <div className="path-field">
             <input
@@ -383,6 +451,116 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
               …
             </button>
           </div>
+        </div>
+
+        <div className="field">
+          <span className="field-label" id="app-mode-label">
+            App-Modus
+          </span>
+          <p className="field-hint">
+            <strong>Empfang</strong> sieht alle Faxe und weist Nutzer zu.{' '}
+            <strong>Empfänger</strong> sieht nur die ihm zugewiesenen Dokumente.
+          </p>
+          <div className="radio-group" role="radiogroup" aria-labelledby="app-mode-label">
+            <label className="radio-row">
+              <input
+                type="radio"
+                name="app-mode"
+                checked={appMode === 'reception'}
+                onChange={() => setAppMode('reception')}
+              />
+              <span>Empfang / Sortierung / Zentrale</span>
+            </label>
+            <label className="radio-row">
+              <input
+                type="radio"
+                name="app-mode"
+                checked={appMode === 'recipient'}
+                onChange={() => setAppMode('recipient')}
+              />
+              <span>Empfänger / Ausführender</span>
+            </label>
+          </div>
+          {appMode === 'recipient' ? (
+            <>
+              <label htmlFor="client-user-name" style={{ marginTop: 10 }}>
+                Dieser Client ist
+              </label>
+              <select
+                id="client-user-name"
+                value={clientUserName}
+                onChange={(e) => setClientUserName(e.target.value)}
+                aria-label="Benutzer für diesen Client"
+              >
+                <option value="">— Benutzer wählen —</option>
+                {users.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </select>
+              {users.length === 0 ? (
+                <p className="field-hint">Zuerst unten Benutzer anlegen (idealerweise über den Statusordner).</p>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+
+        <div className="field">
+          <span className="field-label" id="users-label">
+            Benutzer für Zuordnung
+          </span>
+          <p className="field-hint">
+            Zentrale Liste in der Status-Datei. Am Empfang werden Faxe diesen Namen zugewiesen.
+          </p>
+          <div className="user-add-row">
+            <input
+              id="new-user-name"
+              value={newUserName}
+              onChange={(e) => setNewUserName(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  void addUser()
+                }
+              }}
+              placeholder="z. B. Max Mustermann"
+              aria-labelledby="users-label"
+              disabled={usersBusy}
+            />
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={usersBusy || !newUserName.trim()}
+              onClick={() => void addUser()}
+            >
+              Hinzufügen
+            </button>
+          </div>
+          {usersError ? (
+            <p style={{ color: 'var(--danger)', fontSize: 13, margin: 0 }}>{usersError}</p>
+          ) : null}
+          {users.length === 0 ? (
+            <p className="field-hint">Noch keine Benutzer angelegt.</p>
+          ) : (
+            <ul className="user-list" aria-label="Benutzerliste">
+              {users.map((u) => (
+                <li key={u} className="user-list-item">
+                  <span>{u}</span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-danger"
+                    disabled={usersBusy}
+                    onClick={() => void removeUser(u)}
+                    aria-label={`${u} entfernen`}
+                  >
+                    Entfernen
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="field">

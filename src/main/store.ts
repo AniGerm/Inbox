@@ -3,7 +3,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import {
   DEFAULT_SETTINGS,
+  normalizeAppMode,
   normalizeFaxFolders,
+  normalizeUserName,
   type AppSettings,
   type DuplexMode,
   type InboxStateFile,
@@ -83,6 +85,8 @@ export function loadSettings(): AppSettings {
         ? raw.exportButtonLabel.trim()
         : DEFAULT_SETTINGS.exportButtonLabel,
     stateFolder: normalizeOptionalFolder(raw.stateFolder),
+    appMode: normalizeAppMode(raw.appMode),
+    clientUserName: normalizeUserName(raw.clientUserName),
   }
 }
 
@@ -119,7 +123,11 @@ export function getInboxStatePath(): string {
 }
 
 export function loadInboxState(): InboxStateFile {
-  return readJsonFile(getInboxStatePath(), { items: [] })
+  const raw = readJsonFile(getInboxStatePath(), { items: [], users: [] })
+  return {
+    users: Array.isArray(raw.users) ? raw.users : [],
+    items: Array.isArray(raw.items) ? raw.items : [],
+  }
 }
 
 export function saveInboxState(state: InboxStateFile): void {

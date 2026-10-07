@@ -79,6 +79,8 @@ function seed() {
             printedAt: null,
             exportStatus: 'none',
             exportedAt: null,
+            assignedTo: null,
+            assignedAt: null,
           },
           {
             path: path.join(faxDir, 'termin-bestaetigung.pdf'),
@@ -89,8 +91,11 @@ function seed() {
             printedAt: new Date(Date.now() - 1800_000).toISOString(),
             exportStatus: 'exported',
             exportedAt: new Date(Date.now() - 1200_000).toISOString(),
+            assignedTo: 'Max',
+            assignedAt: new Date(Date.now() - 1500_000).toISOString(),
           },
         ],
+        users: ['Max', 'Anna'],
       },
       null,
       2,
@@ -157,6 +162,8 @@ app.whenReady().then(async () => {
       printedAt: null,
       exportStatus: 'none',
       exportedAt: null,
+      assignedTo: null,
+      assignedAt: null,
     },
     {
       path: path.join(faxDir, 'termin-bestaetigung.pdf'),
@@ -169,6 +176,8 @@ app.whenReady().then(async () => {
       printedAt: new Date(Date.now() - 86_000_000).toISOString(),
       exportStatus: 'exported',
       exportedAt: new Date(Date.now() - 80_000_000).toISOString(),
+      assignedTo: 'Max',
+      assignedAt: new Date(Date.now() - 85_000_000).toISOString(),
     },
     {
       path: path.join(faxDir, 'rechnung-alt.pdf'),
@@ -181,6 +190,8 @@ app.whenReady().then(async () => {
       printedAt: null,
       exportStatus: 'none',
       exportedAt: null,
+      assignedTo: null,
+      assignedAt: null,
     },
   ]
 
@@ -188,6 +199,8 @@ app.whenReady().then(async () => {
     faxFolder: faxDir,
     notificationsEnabled: false,
     autostart: false,
+    appMode: 'reception',
+    clientUserName: null,
   }
 
   ipcMain.handle('get-settings', () => settings)

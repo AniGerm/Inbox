@@ -1,6 +1,9 @@
 export type PrintStatus = 'none' | 'printing' | 'printed' | 'error'
 export type ExportStatus = 'none' | 'exporting' | 'exported' | 'error'
 
+/** Reception = triage/central; recipient = end-user client filtered by assignment */
+export type AppMode = 'reception' | 'recipient'
+
 export interface FaxItem {
   path: string
   name: string
@@ -16,6 +19,10 @@ export interface FaxItem {
   exportStatus: ExportStatus
   /** ISO timestamp of last successful export copy; null if never exported */
   exportedAt: string | null
+  /** Assigned recipient user name from the shared users list; null = unassigned */
+  assignedTo: string | null
+  /** ISO timestamp of last assignment; null if never assigned */
+  assignedAt: string | null
 }
 
 export type PrintMethod = 'external' | 'direct'
@@ -53,6 +60,10 @@ export interface AppSettings {
    * All clients that point here stay in sync. null = local userData only.
    */
   stateFolder: string | null
+  /** reception = Empfang/Sortierung; recipient = Empfänger/Ausführender */
+  appMode: AppMode
+  /** When appMode is recipient: which shared user this client represents */
+  clientUserName: string | null
 }
 
 /** Events forwarded from electron-updater to the renderer */
@@ -66,6 +77,8 @@ export type UpdateStatusEvent =
   | { type: 'error'; message: string }
 
 export interface InboxStateFile {
+  /** Shared user names for assignment (central list for all clients) */
+  users?: string[]
   items: Array<{
     path: string
     addedAt: string
@@ -75,6 +88,8 @@ export interface InboxStateFile {
     printedAt?: string | null
     exportStatus?: ExportStatus
     exportedAt?: string | null
+    assignedTo?: string | null
+    assignedAt?: string | null
   }>
 }
 
@@ -93,6 +108,33 @@ export const DEFAULT_SETTINGS: AppSettings = {
   exportFolder: null,
   exportButtonLabel: 'In Ordner kopieren',
   stateFolder: null,
+  appMode: 'reception',
+  clientUserName: null,
+}
+
+export function normalizeAppMode(value: unknown): AppMode {
+  return value === 'recipient' ? 'recipient' : 'reception'
+}
+
+export function normalizeUserName(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+/** Unique non-empty trimmed user names, stable order. */
+export function normalizeUsers(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const entry of value) {
+    if (typeof entry !== 'string') continue
+    const name = entry.trim()
+    if (!name) continue
+    const key = name.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(name)
+  }
+  return out
 }
 
 /** Unique non-empty folder list; prefer faxFolders, fall back to legacy faxFolder. */

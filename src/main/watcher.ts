@@ -2,7 +2,13 @@ import chokidar, { type FSWatcher } from 'chokidar'
 import fs from 'node:fs'
 import path from 'node:path'
 import { loadInboxState, saveInboxState, getInboxStatePath } from './store'
-import { ARCHIVE_DIR_NAME, type ExportStatus, type FaxItem, type PrintStatus } from '../shared/types'
+import {
+  ARCHIVE_DIR_NAME,
+  normalizeUsers,
+  type ExportStatus,
+  type FaxItem,
+  type PrintStatus,
+} from '../shared/types'
 
 type KnownItem = {
   path: string
@@ -13,6 +19,22 @@ type KnownItem = {
   printedAt?: string | null
   exportStatus?: ExportStatus
   exportedAt?: string | null
+  assignedTo?: string | null
+  assignedAt?: string | null
+}
+
+function assignmentFieldsFromKnown(
+  existing?: KnownItem,
+): Pick<FaxItem, 'assignedTo' | 'assignedAt'> {
+  const assignedTo =
+    typeof existing?.assignedTo === 'string' && existing.assignedTo.trim()
+      ? existing.assignedTo.trim()
+      : null
+  const assignedAt =
+    assignedTo && typeof existing?.assignedAt === 'string' && existing.assignedAt
+      ? existing.assignedAt
+      : null
+  return { assignedTo, assignedAt }
 }
 
 function printFieldsFromKnown(existing?: KnownItem): Pick<FaxItem, 'printStatus' | 'printedAt'> {
@@ -107,6 +129,7 @@ export class FaxWatcher {
   private watcher: FSWatcher | null = null
   private folders: string[] = []
   private items = new Map<string, FaxItem>()
+  private users: string[] = []
   private callbacks: WatcherCallbacks
   private rescanTimer: ReturnType<typeof setInterval> | null = null
   private stateSyncTimer: ReturnType<typeof setInterval> | null = null
@@ -115,6 +138,67 @@ export class FaxWatcher {
 
   constructor(callbacks: WatcherCallbacks) {
     this.callbacks = callbacks
+  }
+
+  getUsers(): string[] {
+    return [...this.users]
+  }
+
+  addUser(name: string): string[] {
+    const trimmed = name.trim()
+    if (!trimmed) throw new Error('Benutzername darf nicht leer sein.')
+    const key = trimmed.toLowerCase()
+    if (this.users.some((u) => u.toLowerCase() === key)) {
+      return this.getUsers()
+    }
+    this.users = [...this.users, trimmed]
+    this.persist()
+    this.emit()
+    return this.getUsers()
+  }
+
+  removeUser(name: string): string[] {
+    const key = name.trim().toLowerCase()
+    if (!key) return this.getUsers()
+    const before = this.users.length
+    this.users = this.users.filter((u) => u.toLowerCase() !== key)
+    if (this.users.length === before) return this.getUsers()
+
+    let cleared = false
+    for (const item of this.items.values()) {
+      if (item.assignedTo?.toLowerCase() === key) {
+        item.assignedTo = null
+        item.assignedAt = null
+        cleared = true
+      }
+    }
+    this.persist()
+    if (cleared) this.emit()
+    else this.emit()
+    return this.getUsers()
+  }
+
+  /** Assign fax to a shared user, or null to clear assignment. */
+  assignFax(filePath: string, userName: string | null): FaxItem[] {
+    const item = this.items.get(this.key(filePath))
+    if (!item) throw new Error('Eintrag nicht gefunden')
+
+    if (userName === null || userName.trim() === '') {
+      item.assignedTo = null
+      item.assignedAt = null
+      this.persist()
+      this.emit()
+      return this.getItems()
+    }
+
+    const trimmed = userName.trim()
+    const match = this.users.find((u) => u.toLowerCase() === trimmed.toLowerCase())
+    if (!match) throw new Error('Unbekannter Benutzer. Bitte zuerst in den Einstellungen anlegen.')
+    item.assignedTo = match
+    item.assignedAt = new Date().toISOString()
+    this.persist()
+    this.emit()
+    return this.getItems()
   }
 
   private key(filePath: string): string {
@@ -175,12 +259,14 @@ export class FaxWatcher {
     }
     this.items.clear()
 
+    const state = loadInboxState()
+    this.users = normalizeUsers(state.users)
+
     if (this.folders.length === 0) {
       this.emit()
       return
     }
 
-    const state = loadInboxState()
     const known = new Map(state.items.map((i) => [this.key(i.path), i]))
 
     const watchRoots: string[] = []
@@ -443,6 +529,7 @@ export class FaxWatcher {
         archived,
         ...printFieldsFromKnown(existing),
         ...exportFieldsFromKnown(existing),
+        ...assignmentFieldsFromKnown(existing),
       })
     }
   }
@@ -494,6 +581,8 @@ export class FaxWatcher {
           printedAt: null,
           exportStatus: 'none',
           exportedAt: null,
+          assignedTo: null,
+          assignedAt: null,
         }
         this.items.set(k, item)
         changed = true
@@ -538,6 +627,8 @@ export class FaxWatcher {
       printedAt: null,
       exportStatus: 'none',
       exportedAt: null,
+      assignedTo: null,
+      assignedAt: null,
     }
     this.items.set(k, item)
     this.persist()
@@ -556,6 +647,7 @@ export class FaxWatcher {
     this.writingState = true
     try {
       saveInboxState({
+        users: this.users,
         items: this.getItems().map(
           ({
             path: p,
@@ -566,6 +658,8 @@ export class FaxWatcher {
             printedAt,
             exportStatus,
             exportedAt,
+            assignedTo,
+            assignedAt,
           }) => ({
             path: p,
             addedAt,
@@ -575,6 +669,8 @@ export class FaxWatcher {
             printedAt,
             exportStatus,
             exportedAt,
+            assignedTo,
+            assignedAt,
           }),
         ),
       })
@@ -600,7 +696,7 @@ export class FaxWatcher {
 
   /**
    * Apply metadata from a shared inbox-state.json written by another client
-   * (seen / print / export). Last writer wins via file mtime.
+   * (seen / print / export / assignment / users). Last writer wins via file mtime.
    */
   private reloadSharedStateIfChanged(): void {
     if (this.writingState) return
@@ -613,6 +709,16 @@ export class FaxWatcher {
 
       const state = loadInboxState()
       let changed = false
+
+      const nextUsers = normalizeUsers(state.users)
+      if (
+        nextUsers.length !== this.users.length ||
+        nextUsers.some((u, i) => u !== this.users[i])
+      ) {
+        this.users = nextUsers
+        changed = true
+      }
+
       for (const known of state.items) {
         const item = this.items.get(this.key(known.path))
         if (!item) continue
@@ -640,6 +746,16 @@ export class FaxWatcher {
         ) {
           item.exportStatus = exportFields.exportStatus
           item.exportedAt = exportFields.exportedAt
+          changed = true
+        }
+
+        const assignment = assignmentFieldsFromKnown(known)
+        if (
+          item.assignedTo !== assignment.assignedTo ||
+          item.assignedAt !== assignment.assignedAt
+        ) {
+          item.assignedTo = assignment.assignedTo
+          item.assignedAt = assignment.assignedAt
           changed = true
         }
 

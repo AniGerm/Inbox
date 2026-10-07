@@ -12,7 +12,13 @@ import fs from 'node:fs'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { FaxWatcher } from './watcher'
-import { loadSettings, saveSettings, migrateLocalStateToSharedIfNeeded } from './store'
+import {
+  loadSettings,
+  saveSettings,
+  migrateLocalStateToSharedIfNeeded,
+  loadInboxState,
+  saveInboxState,
+} from './store'
 import {
   showNewFaxNotification,
   loadTrayIconFromFile,
@@ -20,7 +26,12 @@ import {
   resolveResource,
 } from './notifications'
 import type { AppSettings, FaxItem } from '../shared/types'
-import { normalizeFaxFolders } from '../shared/types'
+import {
+  normalizeAppMode,
+  normalizeFaxFolders,
+  normalizeUserName,
+  normalizeUsers,
+} from '../shared/types'
 import { initUpdater, setPrintingInProgress } from './updater'
 
 // Linux: Chromium setuid/userns sandbox often aborts before any window on
@@ -192,17 +203,35 @@ function createBadgeOverlay(count: number): Electron.NativeImage {
   return loadTrayIconFromFile(count)
 }
 
-function broadcastState(items: FaxItem[], count: number, newlyAdded?: FaxItem): void {
-  latestItems = items
-  unreadCount = count
-  updateTray()
-  mainWindow?.webContents.send('inbox-updated', { items, unreadCount: count })
+/** Unread / notifications respect recipient filter when in Empfänger mode. */
+function filterForClientRole(items: FaxItem[], settings: AppSettings): FaxItem[] {
+  if (settings.appMode !== 'recipient') return items
+  const name = settings.clientUserName?.trim()
+  if (!name) return []
+  return items.filter((i) => i.assignedTo === name)
+}
 
-  if (newlyAdded) {
-    const settings = loadSettings()
-    if (settings.notificationsEnabled) {
-      showNewFaxNotification(newlyAdded.name, newlyAdded.path, openFaxInApp)
+function unreadForClient(items: FaxItem[], settings: AppSettings): number {
+  return filterForClientRole(items, settings).filter(
+    (i) => !i.archived && i.seenAt === null,
+  ).length
+}
+
+function broadcastState(items: FaxItem[], _count: number, newlyAdded?: FaxItem): void {
+  latestItems = items
+  const settings = loadSettings()
+  unreadCount = unreadForClient(items, settings)
+  updateTray()
+  mainWindow?.webContents.send('inbox-updated', { items, unreadCount })
+
+  if (newlyAdded && settings.notificationsEnabled) {
+    // Reception: notify on every new fax. Recipient: only if already assigned to them
+    // (new files arrive unassigned, so recipients are quiet until triage assigns).
+    if (settings.appMode === 'recipient') {
+      const name = settings.clientUserName?.trim()
+      if (!name || newlyAdded.assignedTo !== name) return
     }
+    showNewFaxNotification(newlyAdded.name, newlyAdded.path, openFaxInApp)
   }
 }
 
@@ -487,6 +516,23 @@ function registerIpc(): void {
       next.faxFolders = folders
       next.faxFolder = folders[0] ?? null
     }
+    if (partial.appMode !== undefined) {
+      next.appMode = normalizeAppMode(partial.appMode)
+    }
+    if (partial.clientUserName !== undefined) {
+      next.clientUserName = normalizeUserName(partial.clientUserName)
+    }
+    // Drop client user if no longer in the shared list
+    const users = watcher?.getUsers() ?? normalizeUsers(loadInboxState().users)
+    if (
+      next.clientUserName &&
+      !users.some((u) => u.toLowerCase() === next.clientUserName!.toLowerCase())
+    ) {
+      next.clientUserName = null
+    }
+    if (next.appMode === 'reception') {
+      // Keep stored name for convenience when switching back to recipient
+    }
     saveSettings(next)
     if (partial.autostart !== undefined) {
       applyAutostart(next.autostart)
@@ -500,6 +546,12 @@ function registerIpc(): void {
       partial.stateFolder !== undefined
     ) {
       startWatcherFromSettings()
+    } else if (
+      partial.appMode !== undefined ||
+      partial.clientUserName !== undefined
+    ) {
+      // Recompute tray/unread for role filter without rescan
+      broadcastState(latestItems, unreadCount)
     }
     return next
   })
@@ -612,6 +664,43 @@ function registerIpc(): void {
   ipcMain.handle('rename-fax', (_e, filePath: string, newName: string) => {
     if (!watcher) throw new Error('Watcher nicht bereit')
     return watcher.rename(filePath, newName)
+  })
+
+  ipcMain.handle('assign-fax', (_e, filePath: string, userName: string | null) => {
+    if (!watcher) throw new Error('Watcher nicht bereit')
+    return watcher.assignFax(filePath, userName)
+  })
+
+  ipcMain.handle('get-users', () => {
+    if (watcher) return watcher.getUsers()
+    return normalizeUsers(loadInboxState().users)
+  })
+
+  ipcMain.handle('add-user', (_e, name: string) => {
+    if (watcher) return watcher.addUser(name)
+    const state = loadInboxState()
+    const users = normalizeUsers(state.users)
+    const trimmed = typeof name === 'string' ? name.trim() : ''
+    if (!trimmed) throw new Error('Benutzername darf nicht leer sein.')
+    if (!users.some((u) => u.toLowerCase() === trimmed.toLowerCase())) {
+      users.push(trimmed)
+      saveInboxState({ ...state, users })
+    }
+    return users
+  })
+
+  ipcMain.handle('remove-user', (_e, name: string) => {
+    if (watcher) return watcher.removeUser(name)
+    const state = loadInboxState()
+    const key = typeof name === 'string' ? name.trim().toLowerCase() : ''
+    const users = normalizeUsers(state.users).filter((u) => u.toLowerCase() !== key)
+    const items = (state.items ?? []).map((item) =>
+      item.assignedTo?.toLowerCase() === key
+        ? { ...item, assignedTo: null, assignedAt: null }
+        : item,
+    )
+    saveInboxState({ users, items })
+    return users
   })
 
   ipcMain.handle('print-preview', async (_e, filePath?: string) => {
