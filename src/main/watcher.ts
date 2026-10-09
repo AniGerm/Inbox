@@ -9,7 +9,6 @@ import {
 } from './store'
 import {
   ARCHIVE_DIR_NAME,
-  mergeUsers,
   normalizeNote,
   normalizeTags,
   normalizeUsers,
@@ -163,19 +162,18 @@ export class FaxWatcher {
   }
 
   /**
-   * Shared user list — always re-read from disk so a second client sees names
-   * created elsewhere even before the next mtime poll / after a stale memory copy.
+   * Shared user list — re-read from disk so a second client sees names
+   * created elsewhere. Disk is source of truth (adds and deletes).
    */
   getUsers(): string[] {
     this.pullUsersFromDisk()
     return [...this.users]
   }
 
-  /** Merge disk users into memory (never shrink from a stale in-memory list). */
+  /** Replace in-memory users from the shared state file. */
   pullUsersFromDisk(): void {
     try {
-      const fromDisk = normalizeUsers(loadInboxState().users)
-      this.users = mergeUsers(fromDisk, this.users)
+      this.users = normalizeUsers(loadInboxState().users)
     } catch {
       /* keep memory */
     }
@@ -187,12 +185,13 @@ export class FaxWatcher {
     this.pullUsersFromDisk()
     const key = trimmed.toLowerCase()
     if (this.users.some((u) => u.toLowerCase() === key)) {
-      return this.getUsers()
+      return [...this.users]
     }
     this.users = [...this.users, trimmed]
-    this.persist()
+    // Exact write — do not merge disk back (would be fine here, but keep consistent)
+    this.persist({ usersMode: 'replace' })
     this.emit()
-    return this.getUsers()
+    return [...this.users]
   }
 
   removeUser(name: string): string[] {
@@ -201,7 +200,7 @@ export class FaxWatcher {
     this.pullUsersFromDisk()
     const before = this.users.length
     this.users = this.users.filter((u) => u.toLowerCase() !== key)
-    if (this.users.length === before) return this.getUsers()
+    if (this.users.length === before) return [...this.users]
 
     for (const item of this.items.values()) {
       if (item.assignedTo?.toLowerCase() === key) {
@@ -209,9 +208,10 @@ export class FaxWatcher {
         item.assignedAt = null
       }
     }
-    this.persist()
+    // Exact write — merging disk would resurrect the removed name
+    this.persist({ usersMode: 'replace' })
     this.emit()
-    return this.getUsers()
+    return [...this.users]
   }
 
   /** Assign document to a shared user, or null to clear assignment. */
@@ -818,15 +818,21 @@ export class FaxWatcher {
     this.emit()
   }
 
-  private persist(): void {
+  /**
+   * @param usersMode replace = write this.users as-is (add/remove user).
+   *   merge-from-disk = reload users from shared file first so incidental
+   *   persists (seen/print/…) neither wipe remote adds nor resurrect deletes.
+   */
+  private persist(options?: { usersMode?: 'merge-from-disk' | 'replace' }): void {
+    const usersMode = options?.usersMode ?? 'merge-from-disk'
     this.writingState = true
     try {
-      // Union with disk so a concurrent client add is not wiped by our write
-      try {
-        const diskUsers = normalizeUsers(loadInboxState().users)
-        this.users = mergeUsers(diskUsers, this.users)
-      } catch {
-        /* keep memory */
+      if (usersMode === 'merge-from-disk') {
+        try {
+          this.users = normalizeUsers(loadInboxState().users)
+        } catch {
+          /* keep memory */
+        }
       }
       saveInboxState({
         users: this.users,
