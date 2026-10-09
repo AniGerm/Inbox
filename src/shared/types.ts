@@ -152,6 +152,11 @@ export function normalizeUsers(value: unknown): string[] {
   return out
 }
 
+/** Union of user lists (case-insensitive), stable order of first occurrence. */
+export function mergeUsers(...lists: unknown[]): string[] {
+  return normalizeUsers(lists.flatMap((list) => (Array.isArray(list) ? list : [])))
+}
+
 /** Unique non-empty trimmed tags, stable order (case-insensitive). */
 export function normalizeTags(value: unknown): string[] {
   if (!Array.isArray(value)) return []
