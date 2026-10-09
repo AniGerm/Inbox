@@ -9,6 +9,7 @@ import {
 } from './store'
 import {
   ARCHIVE_DIR_NAME,
+  mergeUsers,
   normalizeNote,
   normalizeTags,
   normalizeUsers,
@@ -161,13 +162,29 @@ export class FaxWatcher {
     this.callbacks = callbacks
   }
 
+  /**
+   * Shared user list — always re-read from disk so a second client sees names
+   * created elsewhere even before the next mtime poll / after a stale memory copy.
+   */
   getUsers(): string[] {
+    this.pullUsersFromDisk()
     return [...this.users]
+  }
+
+  /** Merge disk users into memory (never shrink from a stale in-memory list). */
+  pullUsersFromDisk(): void {
+    try {
+      const fromDisk = normalizeUsers(loadInboxState().users)
+      this.users = mergeUsers(fromDisk, this.users)
+    } catch {
+      /* keep memory */
+    }
   }
 
   addUser(name: string): string[] {
     const trimmed = name.trim()
     if (!trimmed) throw new Error('Benutzername darf nicht leer sein.')
+    this.pullUsersFromDisk()
     const key = trimmed.toLowerCase()
     if (this.users.some((u) => u.toLowerCase() === key)) {
       return this.getUsers()
@@ -181,21 +198,19 @@ export class FaxWatcher {
   removeUser(name: string): string[] {
     const key = name.trim().toLowerCase()
     if (!key) return this.getUsers()
+    this.pullUsersFromDisk()
     const before = this.users.length
     this.users = this.users.filter((u) => u.toLowerCase() !== key)
     if (this.users.length === before) return this.getUsers()
 
-    let cleared = false
     for (const item of this.items.values()) {
       if (item.assignedTo?.toLowerCase() === key) {
         item.assignedTo = null
         item.assignedAt = null
-        cleared = true
       }
     }
     this.persist()
-    if (cleared) this.emit()
-    else this.emit()
+    this.emit()
     return this.getUsers()
   }
 
@@ -230,6 +245,7 @@ export class FaxWatcher {
       return
     }
 
+    this.pullUsersFromDisk()
     const trimmed = userName.trim()
     const match = this.users.find((u) => u.toLowerCase() === trimmed.toLowerCase())
     if (!match) throw new Error('Unbekannter Benutzer. Bitte zuerst in den Einstellungen anlegen.')
@@ -805,6 +821,13 @@ export class FaxWatcher {
   private persist(): void {
     this.writingState = true
     try {
+      // Union with disk so a concurrent client add is not wiped by our write
+      try {
+        const diskUsers = normalizeUsers(loadInboxState().users)
+        this.users = mergeUsers(diskUsers, this.users)
+      } catch {
+        /* keep memory */
+      }
       saveInboxState({
         users: this.users,
         items: this.getItems().map(

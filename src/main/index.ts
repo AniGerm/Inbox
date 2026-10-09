@@ -27,6 +27,7 @@ import {
 } from './notifications'
 import type { AppSettings, FaxItem } from '../shared/types'
 import {
+  mergeUsers,
   normalizeAppMode,
   normalizeAutoArchiveDays,
   normalizeFaxFolders,
@@ -754,13 +755,10 @@ function registerIpc(): void {
   ipcMain.handle('add-user', (_e, name: string) => {
     if (watcher) return watcher.addUser(name)
     const state = loadInboxState()
-    const users = normalizeUsers(state.users)
     const trimmed = typeof name === 'string' ? name.trim() : ''
     if (!trimmed) throw new Error('Benutzername darf nicht leer sein.')
-    if (!users.some((u) => u.toLowerCase() === trimmed.toLowerCase())) {
-      users.push(trimmed)
-      saveInboxState({ ...state, users })
-    }
+    const users = mergeUsers(state.users, [trimmed])
+    saveInboxState({ ...state, users })
     return users
   })
 

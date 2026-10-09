@@ -201,6 +201,11 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
 
   useEffect(() => {
     void refreshUsers()
+    // Shared multi-client list can appear after another PC writes inbox-state.json
+    const id = window.setInterval(() => {
+      void refreshUsers()
+    }, 2500)
+    return () => window.clearInterval(id)
   }, [refreshUsers])
 
   const addUser = async () => {
