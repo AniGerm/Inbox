@@ -118,6 +118,17 @@ jobs:
           name: ${{ github.ref_name }}
           draft: false
           generate_release_notes: true
+          body: |
+            ### Windows-Installation
+            Neuere Setup-`.exe` sind **nicht code-signiert**. Ein direkter Browser-Download kann von SmartScreen blockiert werden („Windows hat den PC geschützt“), obwohl dieselbe Datei über den **App-Updater** problemlos installiert.
+
+            **Empfohlen:**
+            ```powershell
+            irm https://raw.githubusercontent.com/AniGerm/Inbox/main/scripts/download-windows-setup.ps1 | iex
+            ```
+            Oder nach dem Download: `Unblock-File .\Inbox-Setup-*.exe` → Datei starten → bei SmartScreen **Weitere Informationen** → **Trotzdem ausführen**.
+
+            Workaround: ältere Setup (z. B. [v0.4.0](https://github.com/AniGerm/Inbox/releases/tag/v0.4.0)) installieren, danach in der App auf die neueste Version updaten.
           files: dist-release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

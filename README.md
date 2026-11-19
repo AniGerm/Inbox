@@ -12,13 +12,26 @@ Fertige Installer liegen als **GitHub Releases** bereit — **kein Node.js, kein
 
 ### Windows (einfach)
 
-1. Auf der [Releases-Seite](https://github.com/AniGerm/Inbox/releases) die neueste Version öffnen.
-2. Unter **Assets** die Datei **`Inbox-Setup-….exe`** herunterladen (NSIS-Installer).
-3. Die `.exe` starten und den Assistenten durchklicken: **Weiter → Installieren → Fertig**.
+**Empfohlen (umgeht SmartScreen-Blockade beim Browser-Download):** in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/AniGerm/Inbox/main/scripts/download-windows-setup.ps1 | iex
+```
+
+Das Skript lädt `Inbox-Setup-….exe` von GitHub, entfernt die Zone-Markierung (`Unblock-File`) und startet den Installer.
+
+**Alternativ per Browser:**
+
+1. [Releases](https://github.com/AniGerm/Inbox/releases) → neueste Version → **Assets** → **`Inbox-Setup-….exe`**.
+2. Falls Windows „PC geschützt“ / SmartScreen zeigt: **Weitere Informationen** → **Trotzdem ausführen**.  
+   Oder PowerShell: `Unblock-File .\Inbox-Setup-*.exe` und die Datei erneut starten.
+3. Assistent: **Weiter → Installieren → Fertig**.
 4. Startmenü → **„Inbox“**  
    Typischer Pfad: `%LOCALAPPDATA%\Programs\fax-inbox\Inbox.exe`
 
-Danach aktualisiert sich die App bei neueren Releases selbst (Hinweis in der App / unter Einstellungen → Updates).  
+Die Setup-Datei selbst ist in Ordnung (gleiche Datei, die der App-Updater nutzt). Neuere Builds haben oft noch keine SmartScreen-Reputation — deshalb wirkt ein älteres Release im Browser „installierbar“, während das neueste blockiert wird; **nach der ersten Installation aktualisiert die App zuverlässig von allein**.
+
+Danach: Updates in der App / unter Einstellungen → Updates.  
 **Nicht** die portable `.exe` für den Dauerbetrieb nutzen — Auto-Update funktioniert nur mit dem **Setup-Installer**.
 
 ### Ubuntu (einfach)
@@ -273,7 +286,7 @@ Häufige Ursachen: fehlendes `libfuse2` (AppImage), Chromium-Sandbox, oder ein u
 
 | Symptom | Ursache | Lösung |
 | --- | --- | --- |
-| Windows Defender / SmartScreen | unsignierte Setup-`.exe` | „Weitere Informationen“ → trotzdem ausführen; oder Ausschluss setzen |
+| Windows Defender / SmartScreen | unsignierte Setup-`.exe` + Browser-Download (MOTW); neue Builds ohne Reputation | PowerShell-Installer oben; oder „Weitere Informationen“ → trotzdem ausführen; oder `Unblock-File .\Inbox-Setup-*.exe`. Workaround: ältere Setup (z. B. 0.4.0) installieren → in der App updaten |
 | `git` nicht erkannt (nur Self-Build) | Git fehlt | [Git for Windows](https://git-scm.com/download/win) oder ZIP-Variante |
 | ExecutionPolicy / Skripte deaktiviert | PowerShell-Policy | Release-`.exe` nutzen oder `.\install.cmd` |
 | `MissingEndCurlyBrace` / kaputte Zeichen | veraltetes Skript | `git pull` bzw. frisches ZIP von **main** |
