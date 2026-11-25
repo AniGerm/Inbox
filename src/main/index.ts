@@ -351,11 +351,13 @@ async function listCupsPrinters(): Promise<ListedPrinter[]> {
       if (!trimmed) continue
       // en: "Name accepting requests since …"
       // de: "Name akzeptiert Anfragen seit …"
+      // Prefer matching the status phrase so names with spaces (and http://… URLs) stay intact.
       const m =
-        trimmed.match(/^(.+?)\s+accepting\s+requests\b/i) ??
-        trimmed.match(/^(.+?)\s+akzeptiert\s+Anfragen\b/i) ??
-        trimmed.match(/^(\S+)\s+(?:not\s+)?accepting\b/i) ??
-        trimmed.match(/^(\S+)\s+(?:akzeptiert|nimmt)\b/i)
+        trimmed.match(/^(.*?)\s+accepting\s+requests\b/i) ??
+        trimmed.match(/^(.*?)\s+not\s+accepting\s+requests\b/i) ??
+        trimmed.match(/^(.*?)\s+akzeptiert\s+Anfragen\b/i) ??
+        trimmed.match(/^(.*?)\s+(?:nimmt|akzeptiert)\b/i) ??
+        trimmed.match(/^(\S+)\s+(?:not\s+)?accepting\b/i)
       if (!m?.[1]) continue
       const name = m[1].trim()
       if (!name) continue

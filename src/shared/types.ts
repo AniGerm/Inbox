@@ -39,6 +39,37 @@ export interface PrinterInfo {
   isDefault: boolean
 }
 
+/**
+ * Human-readable printer label for UI. Keeps the OS name unchanged for printing;
+ * strips http(s):// and prefers the CUPS queue segment when present so long IPP
+ * URLs are not truncated to a useless "http://…" prefix in narrow selects.
+ */
+export function formatPrinterLabel(name: string): string {
+  const raw = name.trim()
+  if (!raw) return raw
+
+  const withoutScheme = raw.replace(/^https?:\/\//i, '')
+  if (withoutScheme === raw) return raw
+
+  // host[:port]/printers/Queue → "Queue · host[:port]"
+  const cupsQueue = withoutScheme.match(/^([^/?#]+)\/printers\/([^/?#]+)/i)
+  if (cupsQueue) {
+    let queue = cupsQueue[2]
+    try {
+      queue = decodeURIComponent(queue)
+    } catch {
+      /* keep raw segment */
+    }
+    return `${queue} · ${cupsQueue[1]}`
+  }
+
+  // host[:port]/ipp/print → "host[:port] (IPP)"
+  const ipp = withoutScheme.match(/^([^/?#]+)\/ipp\b/i)
+  if (ipp) return `${ipp[1]} (IPP)`
+
+  return withoutScheme
+}
+
 export interface AppSettings {
   /** Primary / first watched folder (legacy + convenience) */
   faxFolder: string | null

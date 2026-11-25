@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import type {
-  AppMode,
-  AppSettings,
-  DuplexMode,
-  PrintMethod,
-  PrinterInfo,
-  UpdateStatusEvent,
+import {
+  formatPrinterLabel,
+  type AppMode,
+  type AppSettings,
+  type DuplexMode,
+  type PrintMethod,
+  type PrinterInfo,
+  type UpdateStatusEvent,
 } from '../../shared/types'
 
 type Props = {
@@ -707,17 +708,20 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
                 <select
                   id="printer-name"
                   value={printerName}
+                  title={printerName || undefined}
                   onChange={(e) => setPrinterName(e.target.value)}
                   disabled={printersLoading}
                 >
                   <option value="">— bitte wählen —</option>
                   {/* Keep saved name visible while the list loads / if missing from OS list */}
                   {printerName && !printers.some((p) => p.name === printerName) ? (
-                    <option value={printerName}>{printerName}</option>
+                    <option value={printerName} title={printerName}>
+                      {formatPrinterLabel(printerName)}
+                    </option>
                   ) : null}
                   {printers.map((p) => (
-                    <option key={p.name} value={p.name}>
-                      {p.name}
+                    <option key={p.name} value={p.name} title={p.name}>
+                      {formatPrinterLabel(p.name)}
                       {p.isDefault ? ' (Standard)' : ''}
                     </option>
                   ))}
