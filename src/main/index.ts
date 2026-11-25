@@ -289,22 +289,47 @@ async function printViaExternalViewer(filePath: string): Promise<void> {
   }
 }
 
-type ListedPrinter = { name: string; isDefault: boolean }
+type ListedPrinter = { name: string; isDefault: boolean; portName?: string }
 
+/**
+ * pdf-to-printer parses CIM text with `line.split(":")`, which truncates IPP/CUPS
+ * names like `\\http://host:631/printers/Queue` to `\\http`. List via JSON instead.
+ */
 async function listWindowsPrinters(): Promise<ListedPrinter[]> {
   try {
-    // Lazy require so Linux builds don't load the Windows-only package at startup.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const ptp = require('pdf-to-printer') as typeof import('pdf-to-printer')
-    const [printers, defaultPrinter] = await Promise.all([
-      ptp.getPrinters(),
-      ptp.getDefaultPrinter(),
-    ])
-    const defaultName = defaultPrinter?.name ?? null
-    return printers.map((p) => ({
-      name: p.name,
-      isDefault: defaultName !== null && p.name === defaultName,
-    }))
+    const script = [
+      '[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)',
+      'Get-CimInstance Win32_Printer -Property DeviceID,Name,PortName,Default |',
+      '  Select-Object DeviceID,Name,PortName,Default |',
+      '  ConvertTo-Json -Compress',
+    ].join('; ')
+    const { stdout } = await execFileAsync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', script],
+      { encoding: 'utf8', timeout: 20_000, windowsHide: true },
+    )
+    const trimmed = stdout.trim()
+    if (!trimmed) return []
+
+    const parsed = JSON.parse(trimmed) as
+      | { Name?: string; PortName?: string; Default?: boolean }
+      | { Name?: string; PortName?: string; Default?: boolean }[]
+    const rows = Array.isArray(parsed) ? parsed : [parsed]
+
+    const printers: ListedPrinter[] = []
+    const seen = new Set<string>()
+    for (const row of rows) {
+      const name = typeof row.Name === 'string' ? row.Name.trim() : ''
+      if (!name || seen.has(name)) continue
+      seen.add(name)
+      const portName = typeof row.PortName === 'string' ? row.PortName.trim() : ''
+      printers.push({
+        name,
+        portName: portName || undefined,
+        isDefault: Boolean(row.Default),
+      })
+    }
+    return printers
   } catch (err) {
     console.error('Windows-Druckerliste fehlgeschlagen:', err)
     return []

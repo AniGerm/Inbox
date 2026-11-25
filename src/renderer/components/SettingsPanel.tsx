@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  formatPrinterLabel,
+  printerDisplayLabel,
   type AppMode,
   type AppSettings,
   type DuplexMode,
@@ -157,11 +157,22 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
       setPrinterName((current) => {
         const saved = current.trim()
         if (saved) {
-          // Prefer exact match; fall back to case-insensitive so the label shows
           const exact = list.find((p) => p.name === saved)
           if (exact) return exact.name
           const loose = list.find((p) => p.name.toLowerCase() === saved.toLowerCase())
-          return loose?.name ?? saved
+          if (loose) return loose.name
+          // Old pdf-to-printer bug truncated IPP names at ":" → saved "\\http"
+          if (/^\\{0,2}https?$/i.test(saved)) {
+            const prefixed = list.filter((p) => p.name.replace(/^\\+/, '').startsWith('http'))
+            if (prefixed.length === 1) return prefixed[0].name
+            const defHttp = prefixed.find((p) => p.isDefault)
+            if (defHttp) return defHttp.name
+            return ''
+          }
+          // Saved value is a prefix of exactly one full OS name
+          const prefixed = list.filter((p) => p.name.startsWith(saved))
+          if (prefixed.length === 1) return prefixed[0].name
+          return saved
         }
         const def = list.find((p) => p.isDefault)
         return def?.name ?? ''
@@ -716,12 +727,12 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
                   {/* Keep saved name visible while the list loads / if missing from OS list */}
                   {printerName && !printers.some((p) => p.name === printerName) ? (
                     <option value={printerName} title={printerName}>
-                      {formatPrinterLabel(printerName)}
+                      {printerDisplayLabel(printerName)}
                     </option>
                   ) : null}
                   {printers.map((p) => (
                     <option key={p.name} value={p.name} title={p.name}>
-                      {formatPrinterLabel(p.name)}
+                      {printerDisplayLabel(p.name, p.portName)}
                       {p.isDefault ? ' (Standard)' : ''}
                     </option>
                   ))}
@@ -743,10 +754,14 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
                 </p>
               )}
               {!printersLoading &&
-                printers.some((p) => /^\\?\\?https?:\/\//i.test(p.name) || /^https?:\/\//i.test(p.name)) && (
+                printers.some(
+                  (p) =>
+                    /https?:\/\//i.test(p.name) ||
+                    (p.portName ? /https?:\/\//i.test(p.portName) : false),
+                ) && (
                   <p className="field-hint">
-                    CUPS/IPP-Freigaben werden mit dem Warteschlangen-Namen angezeigt (nicht als „\\http…“).
-                    Volle Adresse steht im Tooltip.
+                    CUPS/IPP-Freigaben erscheinen mit Warteschlangen-Namen (z. B. „Empfang · server“).
+                    Tooltip = technischer Windows-Name.
                   </p>
                 )}
             </div>
