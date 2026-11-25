@@ -291,49 +291,77 @@ async function printViaExternalViewer(filePath: string): Promise<void> {
 
 type ListedPrinter = { name: string; isDefault: boolean; portName?: string }
 
+type WinPrinterRow = { Name?: string; PortName?: string; Default?: boolean }
+
+function parseWindowsPrinterJson(stdout: string): ListedPrinter[] {
+  const trimmed = stdout.trim()
+  if (!trimmed) return []
+
+  const parsed = JSON.parse(trimmed) as WinPrinterRow | WinPrinterRow[]
+  const rows = Array.isArray(parsed) ? parsed : [parsed]
+  const printers: ListedPrinter[] = []
+  const seen = new Set<string>()
+  for (const row of rows) {
+    const name = typeof row.Name === 'string' ? row.Name.trim() : ''
+    if (!name || seen.has(name)) continue
+    seen.add(name)
+    const portName = typeof row.PortName === 'string' ? row.PortName.trim() : ''
+    printers.push({
+      name,
+      portName: portName || undefined,
+      isDefault: Boolean(row.Default),
+    })
+  }
+  return printers
+}
+
+async function runPowerShellJson(command: string): Promise<string> {
+  const { stdout, stderr } = await execFileAsync(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command],
+    { encoding: 'utf8', timeout: 20_000, windowsHide: true },
+  )
+  if (stderr?.trim()) {
+    console.warn('Windows-Druckerliste PowerShell stderr:', stderr.trim())
+  }
+  return stdout
+}
+
 /**
  * pdf-to-printer parses CIM text with `line.split(":")`, which truncates IPP/CUPS
  * names like `\\http://host:631/printers/Queue` to `\\http`. List via JSON instead.
+ *
+ * Important: keep the Get-CimInstance pipeline on ONE statement. Joining pipeline
+ * stages with ";" produces `|` + `;` and PowerShell returns nothing / errors.
  */
 async function listWindowsPrinters(): Promise<ListedPrinter[]> {
-  try {
-    const script = [
-      '[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)',
-      'Get-CimInstance Win32_Printer -Property DeviceID,Name,PortName,Default |',
-      '  Select-Object DeviceID,Name,PortName,Default |',
-      '  ConvertTo-Json -Compress',
-    ].join('; ')
-    const { stdout } = await execFileAsync(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-Command', script],
-      { encoding: 'utf8', timeout: 20_000, windowsHide: true },
-    )
-    const trimmed = stdout.trim()
-    if (!trimmed) return []
+  const encoding =
+    '[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); ' +
+    '$ErrorActionPreference = "Stop"; '
 
-    const parsed = JSON.parse(trimmed) as
-      | { Name?: string; PortName?: string; Default?: boolean }
-      | { Name?: string; PortName?: string; Default?: boolean }[]
-    const rows = Array.isArray(parsed) ? parsed : [parsed]
+  const attempts = [
+    // Win32_Printer — full Name + PortName + Default
+    encoding +
+      'Get-CimInstance Win32_Printer | Select-Object Name,PortName,Default | ConvertTo-Json -Compress',
+    // Fallback: PrintManagement Get-Printer (Name/PortName/Default)
+    encoding +
+      'Get-Printer | Select-Object Name,PortName,@{n="Default";e={$_.Default}} | ConvertTo-Json -Compress',
+  ]
 
-    const printers: ListedPrinter[] = []
-    const seen = new Set<string>()
-    for (const row of rows) {
-      const name = typeof row.Name === 'string' ? row.Name.trim() : ''
-      if (!name || seen.has(name)) continue
-      seen.add(name)
-      const portName = typeof row.PortName === 'string' ? row.PortName.trim() : ''
-      printers.push({
-        name,
-        portName: portName || undefined,
-        isDefault: Boolean(row.Default),
-      })
+  const errors: string[] = []
+  for (const script of attempts) {
+    try {
+      const stdout = await runPowerShellJson(script)
+      const printers = parseWindowsPrinterJson(stdout)
+      if (printers.length > 0) return printers
+      errors.push(`leere JSON-Antwort für: ${script.slice(encoding.length, encoding.length + 40)}…`)
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : String(err))
     }
-    return printers
-  } catch (err) {
-    console.error('Windows-Druckerliste fehlgeschlagen:', err)
-    return []
   }
+
+  console.error('Windows-Druckerliste fehlgeschlagen:', errors.join(' | '))
+  return []
 }
 
 /** Force English CUPS messages so parsers stay locale-independent. */
