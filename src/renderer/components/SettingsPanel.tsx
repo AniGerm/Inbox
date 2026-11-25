@@ -742,6 +742,13 @@ export default function SettingsPanel({ settings, onSave, onClose, onInstallUpda
                     : 'Keine Drucker gefunden. CUPS prüfen (`lpstat -a`) und Liste aktualisieren.'}
                 </p>
               )}
+              {!printersLoading &&
+                printers.some((p) => /^\\?\\?https?:\/\//i.test(p.name) || /^https?:\/\//i.test(p.name)) && (
+                  <p className="field-hint">
+                    CUPS/IPP-Freigaben werden mit dem Warteschlangen-Namen angezeigt (nicht als „\\http…“).
+                    Volle Adresse steht im Tooltip.
+                  </p>
+                )}
             </div>
 
             <div className="field">
