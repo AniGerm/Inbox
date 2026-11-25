@@ -40,16 +40,25 @@ export interface PrinterInfo {
 }
 
 /**
- * Human-readable printer label for UI. Keeps the OS name unchanged for printing;
- * strips http(s):// and prefers the CUPS queue segment when present so long IPP
- * URLs are not truncated to a useless "http://…" prefix in narrow selects.
+ * Human-readable printer label for UI. Keeps the OS name unchanged for printing.
+ *
+ * Windows clients of a CUPS/IPP server often register queues as
+ * `\\http://host:631/printers/Queue` (UNC-looking). In a narrow <select> that
+ * collapses to "\\http" for every share — strip the scheme junk and show the
+ * queue name so multiple freigaben stay distinguishable.
  */
 export function formatPrinterLabel(name: string): string {
   const raw = name.trim()
   if (!raw) return raw
 
-  const withoutScheme = raw.replace(/^https?:\/\//i, '')
-  if (withoutScheme === raw) return raw
+  // Plain http(s)://… or Windows `\\http://…` / `\\https://…`
+  const withoutScheme = raw.replace(/^\\{0,2}https?:\/\//i, '')
+  if (withoutScheme === raw) {
+    // Classic UNC share \\server\printer
+    const unc = raw.match(/^\\\\([^\\]+)\\(.+)$/)
+    if (unc) return `${unc[2]} · ${unc[1]}`
+    return raw
+  }
 
   // host[:port]/printers/Queue → "Queue · host[:port]"
   const cupsQueue = withoutScheme.match(/^([^/?#]+)\/printers\/([^/?#]+)/i)
