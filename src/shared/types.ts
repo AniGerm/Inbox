@@ -37,6 +37,8 @@ export type DuplexMode = 'simplex' | 'long' | 'short'
 export interface PrinterInfo {
   name: string
   isDefault: boolean
+  /** Windows port (often the real IPP URL when Name was truncated by older listing) */
+  portName?: string
 }
 
 /**
@@ -77,6 +79,19 @@ export function formatPrinterLabel(name: string): string {
   if (ipp) return `${ipp[1]} (IPP)`
 
   return withoutScheme
+}
+
+/**
+ * Label for the settings dropdown. Prefer a readable queue name from Name;
+ * if Name was truncated to "\\http" (old pdf-to-printer colon bug), use PortName.
+ */
+export function printerDisplayLabel(name: string, portName?: string | null): string {
+  const fromName = formatPrinterLabel(name)
+  const truncatedHttp = /^\\{0,2}https?$/i.test(fromName.trim())
+  if (truncatedHttp && portName) {
+    return formatPrinterLabel(portName) || fromName
+  }
+  return fromName
 }
 
 export interface AppSettings {
